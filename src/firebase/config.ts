@@ -19,11 +19,11 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firebase Authentication and get a reference to the service
 export const auth = getAuth(app);
 
-// Configure Google Auth Provider
+// Configure Google Auth Provider - Remove domain restriction to allow both domains
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
-  hd: 'scaler.com', // Allow scaler.com domain (matches your sheet data)
   prompt: 'select_account'
+  // Remove hd restriction since you need both @scaler.com and @ssb.scaler.com
 });
 
 export default app;

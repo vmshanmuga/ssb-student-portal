@@ -18,7 +18,7 @@ const Login: React.FC = () => {
       // Check if email domain is correct - allow both domains
       if (!user.email?.endsWith('@scaler.com') && !user.email?.endsWith('@ssb.scaler.com')) {
         await auth.signOut();
-        toast.error('Please use your @scaler.com email address');
+        toast.error('Please use your @scaler.com or @ssb.scaler.com email address');
         setIsLoading(false);
         return;
       }
