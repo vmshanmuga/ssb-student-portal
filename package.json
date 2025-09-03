@@ -11,9 +11,17 @@
     "@types/node": "^16.18.126",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "@types/react-router-dom": "^5.3.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "firebase": "^11.9.1",
+    "lucide-react": "^0.525.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-hot-toast": "^2.5.2",
+    "react-router-dom": "^7.6.3",
     "react-scripts": "5.0.1",
+    "tailwind-merge": "^3.3.1",
     "typescript": "^4.9.5",
     "web-vitals": "^2.1.4"
   },
@@ -21,7 +29,14 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "backend:push": "cd backend && clasp push",
+    "backend:pull": "cd backend && clasp pull",
+    "backend:deploy": "cd backend && clasp deploy",
+    "backend:logs": "cd backend && clasp logs",
+    "backend:open": "cd backend && clasp open",
+    "dev": "concurrently \"npm start\" \"npm run backend:watch\"",
+    "backend:watch": "cd backend && nodemon --ext js --exec 'clasp push'"
   },
   "eslintConfig": {
     "extends": [
@@ -40,5 +55,10 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@google/clasp": "^2.4.2",
+    "concurrently": "^7.6.0",
+    "nodemon": "^2.0.22"
   }
 }
