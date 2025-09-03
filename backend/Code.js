@@ -24,20 +24,17 @@ function doPost(e) {
   return handleRequest(e);
 }
 
+function doOptions(e) {
+  // Handle preflight CORS requests - GAS handles CORS automatically when deployed as "Anyone"
+  return ContentService.createTextOutput('')
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 function handleRequest(e) {
   try {
-    // Enable CORS
-    const headers = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Content-Type': 'application/json'
-    };
-
-    // Handle preflight OPTIONS request
-    if (e && e.parameter && e.parameter.method === 'OPTIONS') {
-      return ContentService.createTextOutput('')
-        .setMimeType(ContentService.MimeType.JSON);
+    // Handle OPTIONS preflight request
+    if (e.parameter && e.parameter.method === 'OPTIONS') {
+      return doOptions(e);
     }
 
     const action = e.parameter.action;
@@ -45,7 +42,7 @@ function handleRequest(e) {
 
     // Validate student email (except for test action)
     if (action !== 'test' && (!studentEmail || !isValidStudentEmail(studentEmail))) {
-      return createErrorResponse('Invalid or missing student email', headers);
+      return createErrorResponse('Invalid or missing student email');
     }
 
     // Route to appropriate handler
@@ -74,7 +71,7 @@ function handleRequest(e) {
         result = markContentAsRead(e.parameter.contentId, studentEmail);
         break;
       default:
-        return createErrorResponse('Unknown action: ' + action, headers);
+        return createErrorResponse('Unknown action: ' + action);
     }
 
     return ContentService.createTextOutput(JSON.stringify(result))
@@ -82,13 +79,7 @@ function handleRequest(e) {
 
   } catch (error) {
     Logger.log('API Error: ' + error.message);
-    const defaultHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Content-Type': 'application/json'
-    };
-    return createErrorResponse('Server error: ' + error.message, defaultHeaders);
+    return createErrorResponse('Server error: ' + error.message);
   }
 }
 
@@ -102,7 +93,7 @@ function isValidStudentEmail(email) {
 /**
  * Create error response with CORS headers
  */
-function createErrorResponse(message, headers) {
+function createErrorResponse(message) {
   const errorResponse = {
     success: false,
     error: message,
