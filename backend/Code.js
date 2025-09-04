@@ -4,8 +4,19 @@
 // Configuration constants - UPDATE THESE WITH YOUR ACTUAL VALUES
 const SHEET_ID = "1K5DrHxTVignwR4841sYyzziLDNq-rw2lrlDNJWk_Ddk";
 const MAIN_SHEET = "ALLINONE";
+const STUDENT_LOGIN_SHEET = "Student Login";
 const STUDENT_DATA_SHEET = "Student Data";
+const STUDENT_PROFILE_SHEET = "Student Profile";
 const TIMEZONE = "Asia/Kolkata";
+
+// Google Drive configuration for profile pictures
+const MAIN_DRIVE_FOLDER_ID = "1nBvZpPA_pA4-LVd1xV7rnzRI5j1ikAfv";
+const MAIN_DRIVE_FOLDER_NAME = "SSB ALL IN ONE CREATOR";
+
+// ImgBB API configuration for public image hosting
+// Get your free API key from: https://api.imgbb.com/
+const IMGBB_API_KEY = "bcfa113ac09271460674c2e617d293a2"; // Your ImgBB API key
+const IMGBB_UPLOAD_URL = "https://api.imgbb.com/1/upload";
 
 // Firebase configuration - UPDATE THESE AFTER SETTING UP FIREBASE
 const FIREBASE_PROJECT_ID = "scaler-school-of-business";
@@ -37,8 +48,39 @@ function handleRequest(e) {
       return doOptions(e);
     }
 
-    const action = e.parameter.action;
-    const studentEmail = e.parameter.studentEmail;
+    // Handle both GET and POST parameters
+    let params = e.parameter || {};
+    
+    // For POST requests, also check postData
+    if (e.postData) {
+      Logger.log('POST data type: ' + e.postData.type);
+      Logger.log('POST data contents length: ' + (e.postData.contents ? e.postData.contents.length : 0));
+      
+      // If it's form data, parse parameters from contents
+      if (e.postData.type.includes('multipart/form-data')) {
+        const boundary = e.postData.type.split('boundary=')[1];
+        if (boundary && e.postData.contents) {
+          const formData = parseMultipartFormData(e.postData.contents, boundary);
+          params = { ...params, ...formData };
+          Logger.log('Parsed form data keys: ' + Object.keys(formData).join(', '));
+        }
+      } else if (e.postData.type === 'application/x-www-form-urlencoded') {
+        // Parse URL encoded form data
+        const postParams = e.postData.contents.split('&');
+        for (const param of postParams) {
+          const [key, value] = param.split('=');
+          if (key && value) {
+            params[key] = decodeURIComponent(value);
+          }
+        }
+      }
+    }
+
+    const action = params.action;
+    const studentEmail = params.studentEmail;
+    
+    Logger.log('Action: ' + action);
+    Logger.log('Student Email: ' + studentEmail);
 
     // Validate student email (except for test action)
     if (action !== 'test' && (!studentEmail || !isValidStudentEmail(studentEmail))) {
@@ -64,11 +106,23 @@ function handleRequest(e) {
       case 'getStudentProfile':
         result = getStudentProfile(studentEmail);
         break;
+      case 'getFullStudentProfile':
+        result = getFullStudentProfile(studentEmail);
+        break;
+      case 'updateStudentProfile':
+        result = updateStudentProfile(studentEmail, JSON.parse(e.parameter.profileData || '{}'));
+        break;
       case 'getUpcomingDeadlines':
         result = getUpcomingDeadlines(studentEmail);
         break;
       case 'markContentAsRead':
         result = markContentAsRead(e.parameter.contentId, studentEmail);
+        break;
+      case 'uploadProfilePicture':
+        result = uploadProfilePicture(studentEmail, params.imageData, params.fileName, params.mimeType);
+        break;
+      case 'getDashboardLinks':
+        result = getDashboardLinks(studentEmail);
         break;
       default:
         return createErrorResponse('Unknown action: ' + action);
@@ -440,40 +494,28 @@ function submitAcknowledgment(contentId, studentEmail, response) {
  */
 function getStudentProfile(studentEmail) {
   try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(STUDENT_DATA_SHEET);
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(STUDENT_LOGIN_SHEET);
     const data = sheet.getDataRange().getValues();
     
     if (data.length <= 1) {
       return {
         success: false,
-        error: 'No student data found'
+        error: 'No student login data found'
       };
     }
 
     const headers = data[0];
     
-    // Find the student
+    // Find the student in Student Login sheet
     for (let i = 1; i < data.length; i++) {
       if (data[i][0] === studentEmail) {
         const row = data[i];
         
-        // Get all options for this student
-        const options = [];
-        for (let j = 4; j < headers.length; j++) { // Start from Options1 column
-          const header = headers[j];
-          const value = row[j];
-          
-          if (header && header.toLowerCase().startsWith('options') && value) {
-            options.push(value.toString().trim());
-          }
-        }
-
         const studentProfile = {
           email: row[0],
           fullName: row[1] || '',
           rollNo: row[2] || '',
-          batch: row[3] || '',
-          options: options
+          batch: row[3] || ''
         };
 
         return {
@@ -485,7 +527,7 @@ function getStudentProfile(studentEmail) {
 
     return {
       success: false,
-      error: 'Student not found in database'
+      error: 'Student not found in login database'
     };
 
   } catch (error) {
@@ -493,6 +535,263 @@ function getStudentProfile(studentEmail) {
     return {
       success: false,
       error: 'Failed to get student profile: ' + error.message
+    };
+  }
+}
+
+/**
+ * Get full student profile from Student Profile sheet
+ * @param {string} studentEmail - Student's email
+ * @return {Object} Full student profile with extended fields
+ */
+function getFullStudentProfile(studentEmail) {
+  try {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(STUDENT_PROFILE_SHEET);
+    const data = sheet.getDataRange().getValues();
+    
+    if (data.length <= 1) {
+      return {
+        success: false,
+        error: 'No student profile data found'
+      };
+    }
+
+    const headers = data[0];
+    
+    // Find the student in Student Profile sheet
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === studentEmail) {
+        const row = data[i];
+        
+        const fullProfile = {
+          email: row[0] || '',
+          fullName: row[1] || '',
+          rollNo: row[2] || '',
+          batch: row[3] || '',
+          aboutMe: row[4] || '',
+          phoneNo: row[5] || '',
+          currentLocation: row[6] || '',
+          linkedIn: row[7] || '',
+          portfolioLink: row[8] || '',
+          github: row[9] || '',
+          undergraduateCollege: row[10] || '',
+          undergraduateStream: row[11] || '',
+          graduationYear: row[12] || '',
+          previousCompany: row[13] || '',
+          previousRole: row[14] || '',
+          previousDuration: row[15] || '',
+          techSkills: row[16] || '',
+          softSkills: row[17] || '',
+          achievements: row[18] || '',
+          certifications: row[19] || '',
+          interests: row[20] || '',
+          languages: row[21] || '',
+          profilePicture: row[22] || ''
+        };
+
+        return {
+          success: true,
+          data: fullProfile
+        };
+      }
+    }
+
+    // If student not found in profile sheet, create a new row with basic info from login sheet
+    const loginResult = getStudentProfile(studentEmail);
+    if (loginResult.success) {
+      const basicProfile = {
+        email: loginResult.data.email,
+        fullName: loginResult.data.fullName,
+        rollNo: loginResult.data.rollNo,
+        batch: loginResult.data.batch,
+        aboutMe: '',
+        phoneNo: '',
+        currentLocation: '',
+        linkedIn: '',
+        portfolioLink: '',
+        github: '',
+        undergraduateCollege: '',
+        undergraduateStream: '',
+        graduationYear: '',
+        previousCompany: '',
+        previousRole: '',
+        previousDuration: '',
+        techSkills: '',
+        softSkills: '',
+        achievements: '',
+        certifications: '',
+        interests: '',
+        languages: '',
+        profilePicture: ''
+      };
+
+      // Add the student to the profile sheet
+      const newRow = [
+        basicProfile.email,
+        basicProfile.fullName,
+        basicProfile.rollNo,
+        basicProfile.batch,
+        basicProfile.aboutMe,
+        basicProfile.phoneNo,
+        basicProfile.currentLocation,
+        basicProfile.linkedIn,
+        basicProfile.portfolioLink,
+        basicProfile.github,
+        basicProfile.undergraduateCollege,
+        basicProfile.undergraduateStream,
+        basicProfile.graduationYear,
+        basicProfile.previousCompany,
+        basicProfile.previousRole,
+        basicProfile.previousDuration,
+        basicProfile.techSkills,
+        basicProfile.softSkills,
+        basicProfile.achievements,
+        basicProfile.certifications,
+        basicProfile.interests,
+        basicProfile.languages,
+        basicProfile.profilePicture
+      ];
+      
+      sheet.appendRow(newRow);
+
+      return {
+        success: true,
+        data: basicProfile
+      };
+    }
+
+    return {
+      success: false,
+      error: 'Student not found in login database'
+    };
+
+  } catch (error) {
+    Logger.log('Error in getFullStudentProfile: ' + error.message);
+    return {
+      success: false,
+      error: 'Failed to get full student profile: ' + error.message
+    };
+  }
+}
+
+/**
+ * Update student profile in Student Profile sheet
+ * @param {string} studentEmail - Student's email
+ * @param {Object} profileData - Profile data to update
+ * @return {Object} Result
+ */
+function updateStudentProfile(studentEmail, profileData) {
+  try {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(STUDENT_PROFILE_SHEET);
+    const data = sheet.getDataRange().getValues();
+    
+    if (data.length <= 1) {
+      return {
+        success: false,
+        error: 'No student profile data found'
+      };
+    }
+
+    const headers = data[0];
+    let rowIndex = -1;
+    
+    // Find the student in Student Profile sheet
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === studentEmail) {
+        rowIndex = i;
+        break;
+      }
+    }
+
+    // If student not found, try to add them from login data
+    if (rowIndex === -1) {
+      const loginResult = getStudentProfile(studentEmail);
+      if (!loginResult.success) {
+        return {
+          success: false,
+          error: 'Student not found in login database'
+        };
+      }
+
+      // Add new row with basic info
+      const newRow = [
+        studentEmail,
+        loginResult.data.fullName || '',
+        loginResult.data.rollNo || '',
+        loginResult.data.batch || '',
+        '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '' // Empty profile fields
+      ];
+      
+      sheet.appendRow(newRow);
+      rowIndex = sheet.getLastRow() - 1; // Convert to 0-based index
+    }
+
+    // Update the profile data (keep first 4 columns from existing data - read-only)
+    const updatedRow = [
+      studentEmail, // Email (column 0) - read-only
+      data[rowIndex][1] || '', // Full Name (column 1) - read-only from login sheet
+      data[rowIndex][2] || '', // Roll No (column 2) - read-only from login sheet
+      data[rowIndex][3] || '', // Batch (column 3) - read-only from login sheet
+      profileData.aboutMe !== undefined ? profileData.aboutMe : (data[rowIndex][4] || ''), // About Me (column 4)
+      profileData.phoneNo !== undefined ? profileData.phoneNo : (data[rowIndex][5] || ''), // Phone No (column 5)
+      profileData.currentLocation !== undefined ? profileData.currentLocation : (data[rowIndex][6] || ''), // Current Location (column 6)
+      profileData.linkedIn !== undefined ? profileData.linkedIn : (data[rowIndex][7] || ''), // LinkedIn (column 7)
+      profileData.portfolioLink !== undefined ? profileData.portfolioLink : (data[rowIndex][8] || ''), // Portfolio Link (column 8)
+      profileData.github !== undefined ? profileData.github : (data[rowIndex][9] || ''), // GitHub (column 9)
+      profileData.undergraduateCollege !== undefined ? profileData.undergraduateCollege : (data[rowIndex][10] || ''), // Undergraduate College (column 10)
+      profileData.undergraduateStream !== undefined ? profileData.undergraduateStream : (data[rowIndex][11] || ''), // Undergraduate Stream (column 11)
+      profileData.graduationYear !== undefined ? profileData.graduationYear : (data[rowIndex][12] || ''), // Graduation Year (column 12)
+      profileData.previousCompany !== undefined ? profileData.previousCompany : (data[rowIndex][13] || ''), // Previous Company (column 13)
+      profileData.previousRole !== undefined ? profileData.previousRole : (data[rowIndex][14] || ''), // Previous Role (column 14)
+      profileData.previousDuration !== undefined ? profileData.previousDuration : (data[rowIndex][15] || ''), // Previous Duration (column 15)
+      profileData.techSkills !== undefined ? profileData.techSkills : (data[rowIndex][16] || ''), // Tech Skills (column 16)
+      profileData.softSkills !== undefined ? profileData.softSkills : (data[rowIndex][17] || ''), // Soft Skills (column 17)
+      profileData.achievements !== undefined ? profileData.achievements : (data[rowIndex][18] || ''), // Achievements (column 18)
+      profileData.certifications !== undefined ? profileData.certifications : (data[rowIndex][19] || ''), // Certifications (column 19)
+      profileData.interests !== undefined ? profileData.interests : (data[rowIndex][20] || ''), // Interests (column 20)
+      profileData.languages !== undefined ? profileData.languages : (data[rowIndex][21] || ''), // Languages (column 21)
+      profileData.profilePicture !== undefined ? profileData.profilePicture : (data[rowIndex][22] || '') // Profile Picture (column 22)
+    ];
+
+    // Update the row (rowIndex + 1 because sheet rows are 1-based)
+    const range = sheet.getRange(rowIndex + 1, 1, 1, updatedRow.length);
+    range.setValues([updatedRow]);
+
+    return {
+      success: true,
+      message: 'Profile updated successfully',
+      data: {
+        email: updatedRow[0],
+        fullName: updatedRow[1],
+        rollNo: updatedRow[2],
+        batch: updatedRow[3],
+        aboutMe: updatedRow[4],
+        phoneNo: updatedRow[5],
+        currentLocation: updatedRow[6],
+        linkedIn: updatedRow[7],
+        portfolioLink: updatedRow[8],
+        github: updatedRow[9],
+        undergraduateCollege: updatedRow[10],
+        undergraduateStream: updatedRow[11],
+        graduationYear: updatedRow[12],
+        previousCompany: updatedRow[13],
+        previousRole: updatedRow[14],
+        previousDuration: updatedRow[15],
+        techSkills: updatedRow[16],
+        softSkills: updatedRow[17],
+        achievements: updatedRow[18],
+        certifications: updatedRow[19],
+        interests: updatedRow[20],
+        languages: updatedRow[21],
+        profilePicture: updatedRow[22]
+      }
+    };
+
+  } catch (error) {
+    Logger.log('Error in updateStudentProfile: ' + error.message);
+    return {
+      success: false,
+      error: 'Failed to update student profile: ' + error.message
     };
   }
 }
@@ -557,6 +856,440 @@ function markContentAsRead(contentId, studentEmail) {
       error: 'Failed to mark content as read: ' + error.message
     };
   }
+}
+
+/**
+ * Upload image to ImgBB (free image hosting service)
+ * @param {string} imageData - Base64 encoded image data
+ * @param {string} fileName - Original file name
+ * @return {Object} ImgBB upload result
+ */
+function uploadToImgBB(imageData, fileName) {
+  try {
+    Logger.log('Uploading to ImgBB: ' + fileName);
+    
+    // Prepare form data for ImgBB API
+    const payload = {
+      'key': IMGBB_API_KEY,
+      'image': imageData,
+      'name': fileName.replace(/\.[^/.]+$/, ""), // Remove extension
+      'expiration': '' // No expiration (permanent)
+    };
+    
+    const options = {
+      'method': 'POST',
+      'payload': payload
+    };
+    
+    const response = UrlFetchApp.fetch(IMGBB_UPLOAD_URL, options);
+    const responseText = response.getContentText();
+    const result = JSON.parse(responseText);
+    
+    if (result.success) {
+      Logger.log('ImgBB upload successful: ' + result.data.url);
+      return {
+        success: true,
+        data: {
+          url: result.data.url,
+          display_url: result.data.display_url,
+          thumb: {
+            url: result.data.thumb.url
+          },
+          medium: {
+            url: result.data.medium.url
+          },
+          delete_url: result.data.delete_url
+        }
+      };
+    } else {
+      Logger.log('ImgBB upload failed: ' + responseText);
+      return {
+        success: false,
+        error: result.error ? result.error.message : 'Upload failed'
+      };
+    }
+    
+  } catch (error) {
+    Logger.log('Error uploading to ImgBB: ' + error.message);
+    return {
+      success: false,
+      error: 'ImgBB upload error: ' + error.message
+    };
+  }
+}
+
+/**
+ * Upload profile picture to both Google Drive (backup) and ImgBB (public display)
+ * @param {string} studentEmail - Student's email
+ * @param {string} imageData - Base64 encoded image data
+ * @param {string} fileName - Original file name
+ * @param {string} mimeType - MIME type of the image
+ * @return {Object} Upload result with public URL
+ */
+/**
+ * Get dashboard links for student based on their access
+ * @param {string} studentEmail Student email
+ * @return {Object} Dashboard links data
+ */
+function getDashboardLinks(studentEmail) {
+  try {
+    Logger.log(`Getting dashboard links for: ${studentEmail}`);
+    
+    // Get student profile for batch info
+    const studentProfile = getStudentProfile(studentEmail);
+    if (!studentProfile.success) {
+      return {
+        success: false,
+        error: 'Student profile not found'
+      };
+    }
+    
+    const student = studentProfile.data;
+    
+    // Get dashboard data from main sheet
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(MAIN_SHEET);
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const indices = getColumnIndices(headers);
+    
+    const dashboards = [];
+    
+    // Process each row looking for dashboard entries
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      
+      // Check if this row has dashboard data (either static or dashboard-specific columns)
+      const dashboardName = getValue(row, indices.dashboardName) || getValue(row, indices.title);
+      const dashboardLink = getValue(row, indices.dashboardLink) || getValue(row, indices.driveLink) || getValue(row, indices.sheetsLink);
+      const category = getValue(row, indices.category);
+      const eventType = getValue(row, indices.eventType);
+      
+      // Only include rows that are dashboard-related
+      if (!dashboardName || !dashboardLink) continue;
+      
+      // Filter for dashboard entries (check if category or event type indicates dashboard)
+      const isDashboard = (category && category.toLowerCase().includes('dashboard')) || 
+                         (eventType && eventType.toLowerCase().includes('dashboard')) ||
+                         (dashboardName.toLowerCase().includes('dashboard'));
+      
+      if (!isDashboard) continue;
+      
+      // Check if student has access to this dashboard
+      const targetBatch = getValue(row, indices.targetBatch);
+      const targetStudents = getValue(row, indices.targetStudents);
+      
+      if (isContentTargetedToStudent(targetBatch, targetStudents, student)) {
+        dashboards.push({
+          name: dashboardName,
+          link: dashboardLink,
+          description: getValue(row, indices.dashboardDescription) || getValue(row, indices.content) || '',
+          type: getDashboardType(dashboardName),
+          category: category,
+          eventType: eventType
+        });
+      }
+    }
+    
+    Logger.log(`Found ${dashboards.length} dashboards for ${studentEmail}`);
+    
+    return {
+      success: true,
+      data: dashboards
+    };
+    
+  } catch (error) {
+    Logger.log('Error in getDashboardLinks: ' + error.message);
+    return {
+      success: false,
+      error: 'Failed to get dashboard links: ' + error.message
+    };
+  }
+}
+
+/**
+ * Determine dashboard type based on name
+ * @param {string} name Dashboard name
+ * @return {string} Dashboard type
+ */
+function getDashboardType(name) {
+  const lowerName = name.toLowerCase();
+  if (lowerName.includes('academic')) return 'academic';
+  if (lowerName.includes('assignment')) return 'assignment';
+  if (lowerName.includes('attendance')) return 'attendance';
+  if (lowerName.includes('mentorship') || lowerName.includes('mentor')) return 'mentorship';
+  if (lowerName.includes('placement')) return 'placement';
+  return 'general';
+}
+
+function uploadProfilePicture(studentEmail, imageData, fileName, mimeType) {
+  try {
+    Logger.log(`Uploading profile picture for: ${studentEmail}`);
+    
+    // Validate inputs
+    if (!studentEmail || !imageData || !fileName) {
+      return {
+        success: false,
+        error: 'Missing required parameters for profile picture upload'
+      };
+    }
+
+    // Get or create the main drive folder
+    let mainFolder;
+    try {
+      mainFolder = DriveApp.getFolderById(MAIN_DRIVE_FOLDER_ID);
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Main drive folder not found. Please check the MAIN_DRIVE_FOLDER_ID.'
+      };
+    }
+
+    // Get or create the Profile subfolder
+    let profileFolder;
+    const profileFolders = mainFolder.getFoldersByName('Profile');
+    if (profileFolders.hasNext()) {
+      profileFolder = profileFolders.next();
+    } else {
+      profileFolder = mainFolder.createFolder('Profile');
+      Logger.log('Created Profile subfolder in main drive folder');
+    }
+
+    // Get student's full name for folder creation
+    const loginResult = getStudentProfile(studentEmail);
+    if (!loginResult.success) {
+      return {
+        success: false,
+        error: 'Student not found in database'
+      };
+    }
+    
+    const studentName = loginResult.data.fullName || studentEmail.split('@')[0];
+    const sanitizedName = studentName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+    
+    // Get or create the student's personal folder
+    let studentFolder;
+    const studentFolders = profileFolder.getFoldersByName(sanitizedName);
+    if (studentFolders.hasNext()) {
+      studentFolder = studentFolders.next();
+    } else {
+      studentFolder = profileFolder.createFolder(sanitizedName);
+      Logger.log('Created personal folder for student: ' + sanitizedName);
+    }
+
+    // Convert base64 to blob
+    const imageBlob = Utilities.newBlob(
+      Utilities.base64Decode(imageData), 
+      mimeType, 
+      `profile_picture_${Date.now()}.${getFileExtension(mimeType)}`
+    );
+
+    // Delete any existing profile picture for this student in their folder
+    const existingFiles = studentFolder.getFiles();
+    while (existingFiles.hasNext()) {
+      const existingFile = existingFiles.next();
+      if (existingFile.getName().startsWith('profile_picture_')) {
+        studentFolder.removeFile(existingFile);
+        Logger.log('Deleted existing profile picture: ' + existingFile.getName());
+      }
+    }
+
+    // Step 1: Upload to ImgBB for public display (primary)
+    const imgbbResult = uploadToImgBB(imageData, fileName);
+    
+    let publicImageUrl = null;
+    let imgbbUrls = {};
+    
+    if (imgbbResult.success) {
+      publicImageUrl = imgbbResult.data.display_url;
+      imgbbUrls = {
+        full: imgbbResult.data.url,
+        display: imgbbResult.data.display_url,
+        thumb: imgbbResult.data.thumb.url,
+        medium: imgbbResult.data.medium.url
+      };
+      Logger.log('ImgBB upload successful: ' + publicImageUrl);
+    } else {
+      Logger.log('ImgBB upload failed, will use Google Drive as fallback: ' + imgbbResult.error);
+    }
+
+    // Step 2: Upload to Google Drive for backup/storage
+    const uploadedFile = studentFolder.createFile(imageBlob);
+    
+    // Set file sharing to viewable by anyone with the link
+    uploadedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    
+    // Get Google Drive URLs (fallback)
+    const fileId = uploadedFile.getId();
+    const driveUrls = {
+      googleusercontent: `https://lh3.googleusercontent.com/d/${fileId}=w400-h400`,
+      driveDirect: `https://drive.google.com/uc?export=view&id=${fileId}`,
+      thumbnail: `https://drive.google.com/thumbnail?id=${fileId}&sz=w400-h400`,
+      alternative: `https://lh3.googleusercontent.com/d/${fileId}`
+    };
+    
+    // Use ImgBB URL as primary, Google Drive as fallback
+    const finalImageUrl = publicImageUrl || driveUrls.googleusercontent;
+    
+    Logger.log('Profile picture uploaded successfully: ' + uploadedFile.getName());
+    Logger.log('Google Drive File ID: ' + fileId);
+    Logger.log('Final Image URL (primary): ' + finalImageUrl);
+    Logger.log('ImgBB Success: ' + (imgbbResult.success ? 'Yes' : 'No'));
+
+    // Update the student profile in the Student Profile sheet with the final URL
+    const updateResult = updateStudentProfilePicture(studentEmail, finalImageUrl);
+    if (!updateResult.success) {
+      // File was uploaded but profile wasn't updated - log warning but don't fail
+      Logger.log('Warning: Profile picture uploaded but sheet update failed: ' + updateResult.error);
+    }
+
+    return {
+      success: true,
+      data: {
+        profilePictureUrl: finalImageUrl,
+        imgbbUrls: imgbbUrls,
+        driveUrls: driveUrls,
+        driveFileId: fileId,
+        uploadMethod: imgbbResult.success ? 'imgbb' : 'googledrive'
+      },
+      message: `Profile picture uploaded successfully via ${imgbbResult.success ? 'ImgBB' : 'Google Drive'}`
+    };
+
+  } catch (error) {
+    Logger.log('Error in uploadProfilePicture: ' + error.message);
+    return {
+      success: false,
+      error: 'Failed to upload profile picture: ' + error.message
+    };
+  }
+}
+
+/**
+ * Update student profile picture URL in the Student Profile sheet
+ * @param {string} studentEmail - Student's email
+ * @param {string} profilePictureUrl - New profile picture URL
+ * @return {Object} Update result
+ */
+function updateStudentProfilePicture(studentEmail, profilePictureUrl) {
+  try {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(STUDENT_PROFILE_SHEET);
+    const data = sheet.getDataRange().getValues();
+    
+    if (data.length <= 1) {
+      return {
+        success: false,
+        error: 'No student profile data found'
+      };
+    }
+
+    // Find the student in Student Profile sheet
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === studentEmail) {
+        // Update profile picture column (column 23, index 22)
+        sheet.getRange(i + 1, 23).setValue(profilePictureUrl);
+        
+        Logger.log('Updated profile picture URL for: ' + studentEmail);
+        return {
+          success: true,
+          message: 'Profile picture URL updated in sheet'
+        };
+      }
+    }
+
+    // If student not found, try to add them from login data with the new profile picture
+    const loginResult = getStudentProfile(studentEmail);
+    if (loginResult.success) {
+      const newRow = [
+        studentEmail,
+        loginResult.data.fullName || '',
+        loginResult.data.rollNo || '',
+        loginResult.data.batch || '',
+        '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', // Empty profile fields
+        profilePictureUrl // Profile picture URL
+      ];
+      
+      sheet.appendRow(newRow);
+      Logger.log('Added new student profile with picture for: ' + studentEmail);
+      
+      return {
+        success: true,
+        message: 'New student profile created with profile picture'
+      };
+    }
+
+    return {
+      success: false,
+      error: 'Student not found in login database'
+    };
+
+  } catch (error) {
+    Logger.log('Error in updateStudentProfilePicture: ' + error.message);
+    return {
+      success: false,
+      error: 'Failed to update profile picture in sheet: ' + error.message
+    };
+  }
+}
+
+/**
+ * Get file extension from MIME type
+ * @param {string} mimeType - MIME type
+ * @return {string} File extension
+ */
+function getFileExtension(mimeType) {
+  const mimeToExt = {
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'image/bmp': 'bmp'
+  };
+  
+  return mimeToExt[mimeType] || 'jpg';
+}
+
+/**
+ * Parse multipart form data from POST request
+ * @param {string} contents - Raw POST data
+ * @param {string} boundary - Boundary string
+ * @return {Object} Parsed form data
+ */
+function parseMultipartFormData(contents, boundary) {
+  const formData = {};
+  
+  try {
+    const parts = contents.split('--' + boundary);
+    
+    for (const part of parts) {
+      if (part.trim().length === 0 || part === '--') continue;
+      
+      const lines = part.split('\r\n');
+      let fieldName = '';
+      let fieldValue = '';
+      let isBody = false;
+      
+      for (const line of lines) {
+        if (line.includes('Content-Disposition: form-data;')) {
+          const nameMatch = line.match(/name="([^"]+)"/);
+          if (nameMatch) {
+            fieldName = nameMatch[1];
+          }
+        } else if (line.trim() === '' && fieldName && !isBody) {
+          isBody = true;
+        } else if (isBody) {
+          fieldValue += line;
+        }
+      }
+      
+      if (fieldName && fieldValue) {
+        formData[fieldName] = fieldValue.trim();
+      }
+    }
+  } catch (error) {
+    Logger.log('Error parsing multipart form data: ' + error.message);
+  }
+  
+  return formData;
 }
 
 // Helper Functions
@@ -648,26 +1381,69 @@ function calculateContentStatus(startDateTime, endDateTime) {
 function getColumnIndices(headers) {
   const indices = {};
   const mapping = {
-    "ID": "id",
-    "Category": "category", 
-    "Event Type": "eventType",
-    "Title": "title",
-    "SubTitle": "subTitle",
-    "Content": "content",
-    "Posted By": "postedBy",
-    "Created at": "createdAt",
-    "StartDateTime": "startDateTime",
-    "EndDateTime": "endDateTime", 
-    "Status": "status",
-    "Priority": "priority",
-    "Target Batch": "targetBatch",
-    "Target Student(s)": "targetStudents",
-    "File URL": "fileURL",
-    "Require Acknowledgment": "requireAcknowledgment",
-    "Drive Link": "driveLink",
-    "Fileupload Link": "fileuploadLink",
-    "SheetsLink": "sheetsLink",
-    "Edited AT": "editedAt"
+    // STATIC CORE
+    "S.ID": "id",
+    "S.Category": "category", 
+    "S.Event Type": "eventType",
+    "S.Title": "title",
+    "S.SubTitle": "subTitle",
+    "S.Content": "content",
+    "S.Posted By": "postedBy",
+    "S.Created at": "createdAt",
+    "S.Edited at": "editedAt",
+    "S.StartDateTime": "startDateTime",
+    "S.EndDateTime": "endDateTime", 
+    "S.Status": "status",
+    "S.Target Batch": "targetBatch",
+    "S.TERM": "term",
+    "S.Subject": "subject",
+    "S.Groups": "groups",
+    "S.Students": "targetStudents",
+    "S.Priority": "priority",
+    "S.File URL": "fileURL",
+    "S.Drive Link": "driveLink",
+    "S.Fileupload Link": "fileuploadLink",
+    "S.SheetsLink": "sheetsLink",
+    "S.Acknowledge": "requireAcknowledgment",
+    
+    // DASHBOARDS
+    "D.Dashboard Name": "dashboardName",
+    "D.Dashboard Link": "dashboardLink",
+    "D.Description": "dashboardDescription",
+    
+    // COURSE MATERIAL
+    "C.Course": "course",
+    "C.Domain": "domain",
+    "C.MaterialType": "materialType",
+    "C.Learning Objectives": "learningObjectives",
+    "C.Prerequisites": "prerequisites",
+    
+    // ASSIGNMENTS & TASKS
+    "AT.Instructions": "instructions",
+    "AT.Max Points": "maxPoints",
+    "AT.Submission Guidelines": "submissionGuidelines",
+    "AT.Rubric Link": "rubricLink",
+    "AT.Group Size": "groupSize",
+    "AT.Due Date": "dueDate",
+    
+    // ANNOUNCEMENTS
+    "AN.Message Details": "messageDetails",
+    "AN.Call to Action": "callToAction",
+    "AN.Read Tracking": "readTracking",
+    
+    // POLICY & DOCUMENTS
+    "PD.Policy Name": "policyName",
+    "PD.Policy Parent": "policyParent",
+    
+    // EVENTS
+    "E.Event Date": "eventDate",
+    "E.Location / Link": "eventLocation",
+    "E.Agenda": "agenda",
+    "E.Speaker Info (if any)": "speakerInfo",
+    
+    // FORMS
+    "F.Description": "formDescription",
+    "F.Form Link": "formLink"
   };
   
   headers.forEach((header, index) => {

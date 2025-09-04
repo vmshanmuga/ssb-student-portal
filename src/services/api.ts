@@ -1,12 +1,38 @@
 // Backend API service - New authorized web app deployment
-const BACKEND_URL = 'https://script.google.com/macros/s/AKfycby5y9sfgiO1kx_FOoRcCCODtqwxfY_U8YizABmjT46_Bwiy1muPYWY3DFqvI3T3T_MC/exec';
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbxeHJsLq9_X8kivAPW35v5DY3IULTKwzqhnD2FPP6tlIhYCnYYdPHwdFoM6VAikqhI7/exec';
 
 export interface StudentProfile {
   email: string;
   fullName: string;
   rollNo: string;
   batch: string;
-  options: string[];
+  options?: string[];
+}
+
+export interface FullStudentProfile {
+  email: string;
+  fullName: string;
+  rollNo: string;
+  batch: string;
+  aboutMe: string;
+  phoneNo: string;
+  currentLocation: string;
+  linkedIn: string;
+  portfolioLink: string;
+  github: string;
+  undergraduateCollege: string;
+  undergraduateStream: string;
+  graduationYear: string;
+  previousCompany: string;
+  previousRole: string;
+  previousDuration: string;
+  techSkills: string;
+  softSkills: string;
+  achievements: string;
+  certifications: string;
+  interests: string;
+  languages: string;
+  profilePicture: string;
 }
 
 export interface ContentItem {
@@ -78,9 +104,8 @@ class ApiService {
 
       const response = await fetch(`${BACKEND_URL}?${queryParams}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        mode: 'cors',
+        // Remove Content-Type header to avoid preflight request
       });
 
       if (!response.ok) {
@@ -144,6 +169,24 @@ class ApiService {
     });
   }
 
+  // Get full student profile
+  async getFullStudentProfile(studentEmail: string): Promise<ApiResponse<FullStudentProfile>> {
+    return this.makeRequest<FullStudentProfile>('getFullStudentProfile', {
+      studentEmail
+    });
+  }
+
+  // Update student profile
+  async updateStudentProfile(
+    studentEmail: string, 
+    profileData: Partial<FullStudentProfile>
+  ): Promise<ApiResponse<FullStudentProfile>> {
+    return this.makeRequest<FullStudentProfile>('updateStudentProfile', {
+      studentEmail,
+      profileData: JSON.stringify(profileData)
+    });
+  }
+
   // Get upcoming deadlines
   async getUpcomingDeadlines(studentEmail: string): Promise<ApiResponse<ContentItem[]>> {
     return this.makeRequest<ContentItem[]>('getUpcomingDeadlines', {
@@ -156,6 +199,66 @@ class ApiService {
     return this.makeRequest('markContentAsRead', {
       contentId,
       studentEmail
+    });
+  }
+
+  // Get dashboard links
+  async getDashboardLinks(studentEmail: string): Promise<ApiResponse<Array<{name: string, link: string, description: string, type: string, category?: string, eventType?: string}>>> {
+    return this.makeRequest('getDashboardLinks', {
+      studentEmail
+    });
+  }
+
+  // Upload profile picture
+  async uploadProfilePicture(studentEmail: string, imageFile: File): Promise<ApiResponse<{ profilePictureUrl: string }>> {
+    try {
+      // Convert file to base64
+      const base64String = await this.fileToBase64(imageFile);
+      
+      // Use POST request with URL-encoded form data
+      const formBody = new URLSearchParams();
+      formBody.append('action', 'uploadProfilePicture');
+      formBody.append('studentEmail', studentEmail);
+      formBody.append('imageData', base64String);
+      formBody.append('fileName', imageFile.name);
+      formBody.append('mimeType', imageFile.type);
+
+      const response = await fetch(BACKEND_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formBody.toString(),
+        mode: 'cors',
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Error uploading profile picture:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to upload profile picture'
+      };
+    }
+  }
+
+  // Helper method to convert file to base64
+  private fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove the data URL prefix (data:image/jpeg;base64,)
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = error => reject(error);
     });
   }
 

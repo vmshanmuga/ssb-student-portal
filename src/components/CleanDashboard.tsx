@@ -138,17 +138,17 @@ const CleanDashboard: React.FC<DashboardProps> = ({ user }) => {
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <img 
                 src="https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/090/511/original/Copy_of_Logo-White.png?1727164234" 
                 alt="SSB Logo" 
-                className="h-10 w-auto bg-ssb-green p-2 rounded-lg"
+                className="h-8 sm:h-10 w-auto bg-ssb-green p-1 sm:p-2 rounded-lg"
               />
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-sm sm:text-xl font-semibold text-gray-900 truncate">
                   {studentProfile?.fullName || user.displayName}
                 </h1>
-                <p className="text-sm text-gray-500">
+                <p className="text-xs sm:text-sm text-gray-500 truncate">
                   {studentProfile?.rollNo} • {studentProfile?.batch}
                 </p>
               </div>
@@ -157,9 +157,10 @@ const CleanDashboard: React.FC<DashboardProps> = ({ user }) => {
               onClick={() => auth.signOut()}
               variant="outline"
               size="sm"
+              className="flex-shrink-0"
             >
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
+              <LogOut className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Sign Out</span>
             </Button>
           </div>
         </div>
@@ -218,7 +219,7 @@ const CleanDashboard: React.FC<DashboardProps> = ({ user }) => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col gap-4">
               <div className="flex-1">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -232,27 +233,29 @@ const CleanDashboard: React.FC<DashboardProps> = ({ user }) => {
                 </div>
               </div>
               
-              <select
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ssb-green focus:border-transparent"
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-              >
-                <option value="all">All Categories</option>
-                {categories.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-              
-              <select
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ssb-green focus:border-transparent"
-                value={selectedPriority}
-                onChange={(e) => setSelectedPriority(e.target.value)}
-              >
-                <option value="all">All Priorities</option>
-                <option value="high">High Priority</option>
-                <option value="medium">Medium Priority</option>
-                <option value="low">Low Priority</option>
-              </select>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <select
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ssb-green focus:border-transparent"
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                >
+                  <option value="all">All Categories</option>
+                  {categories.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+                
+                <select
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ssb-green focus:border-transparent"
+                  value={selectedPriority}
+                  onChange={(e) => setSelectedPriority(e.target.value)}
+                >
+                  <option value="all">All Priorities</option>
+                  <option value="high">High Priority</option>
+                  <option value="medium">Medium Priority</option>
+                  <option value="low">Low Priority</option>
+                </select>
+              </div>
             </div>
           </CardContent>
         </Card>

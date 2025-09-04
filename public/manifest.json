@@ -1,25 +1,25 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "SSB Portal",
+  "name": "Scaler School of Business - Student's Portal",
   "icons": [
     {
-      "src": "favicon.ico",
+      "src": "https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/090/510/original/Copy_of_Logo.png?1727164226",
       "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "type": "image/png"
     },
     {
-      "src": "logo192.png",
+      "src": "https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/090/510/original/Copy_of_Logo.png?1727164226",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "logo512.png",
+      "src": "https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/090/510/original/Copy_of_Logo.png?1727164226",
       "type": "image/png",
       "sizes": "512x512"
     }
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
+  "theme_color": "#22c55e",
   "background_color": "#ffffff"
 }

@@ -144,7 +144,7 @@ const Login: React.FC = () => {
       
       {/* Main Content */}
       <div className="min-h-screen flex items-center justify-center px-4 py-8 relative z-10">
-        <div className="w-full max-w-7xl grid lg:grid-cols-2 gap-16 items-center">
+        <div className="w-full max-w-7xl grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
           
           {/* Left Side - Epic Branding */}
           <div className="text-center lg:text-left space-y-10">
@@ -161,7 +161,7 @@ const Login: React.FC = () => {
             
             {/* Clean Static Heading */}
             <div>
-              <h1 className="text-6xl lg:text-7xl font-black text-white mb-8 leading-tight text-glow">
+              <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black text-white mb-8 leading-tight text-glow">
                 Step Into The
                 <br />
                 <span className="bg-gradient-to-r from-green-400 via-emerald-300 to-green-500 bg-clip-text text-transparent">
@@ -169,7 +169,7 @@ const Login: React.FC = () => {
                 </span>
               </h1>
               
-              <p className="text-2xl text-gray-300 leading-relaxed max-w-2xl">
+              <p className="text-lg sm:text-xl lg:text-2xl text-gray-300 leading-relaxed max-w-2xl">
                 <span className={`inline-block overflow-hidden whitespace-nowrap ${!typewriterComplete ? 'border-r-2 border-green-400' : ''}`}
                       style={!typewriterComplete ? { animation: 'typewriter 4s steps(40, end) forwards' } : {}}>
                   Your gateway to next-generation academic excellence.
@@ -184,14 +184,14 @@ const Login: React.FC = () => {
           
           {/* Right Side - Clean Login Card */}
           <div className="flex justify-center lg:justify-end">
-            <div className="ultimate-glass rounded-3xl p-10 w-full max-w-lg relative overflow-hidden">
+            <div className="ultimate-glass rounded-3xl p-6 sm:p-10 w-full max-w-lg relative overflow-hidden">
               {/* Minimal Scanning Line Effect */}
               <div className="scan-line"></div>
               
               {/* Header */}
               <div className="text-center mb-12">
-                <h2 className="text-4xl font-bold text-white mb-4">Welcome Back</h2>
-                <p className="text-gray-300 text-xl">Access your academic universe</p>
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-4">Welcome Back</h2>
+                <p className="text-gray-300 text-lg sm:text-xl">Access your academic universe</p>
                 <div className="w-20 h-1 bg-gradient-to-r from-green-400 to-yellow-400 mx-auto mt-4 rounded-full"></div>
               </div>
               
