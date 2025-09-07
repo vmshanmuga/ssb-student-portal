@@ -45,16 +45,21 @@ export interface ContentItem {
   priority: string;
   status: string;
   term?: string;
+  domain?: string;
   subject?: string;
   groups?: string;
   postedBy?: string;
   createdAt: string;
+  editedAt?: string;
+  editedBy?: string;
   startDateTime: string;
   endDateTime: string;
   targetBatch?: string;
+  targetStudents?: string;
   requiresAcknowledgment: boolean;
   driveLink?: string;
   sheetsLink?: string;
+  fileuploadLink?: string;
   hasFiles: boolean;
   isNew: boolean;
   daysUntilDeadline: number | null;
@@ -62,6 +67,46 @@ export interface ContentItem {
     url: string;
     name: string;
   }>;
+  
+  // Category-specific fields
+  
+  // ASSIGNMENTS & TASKS
+  instructions?: string;
+  maxPoints?: string;
+  submissionGuidelines?: string;
+  rubricLink?: string;
+  groupSize?: string;
+  
+  // ANNOUNCEMENTS
+  messageDetails?: string;
+  callToAction?: string;
+  readTracking?: string;
+  
+  // EVENTS
+  eventTitle?: string;
+  eventLocation?: string;
+  eventAgenda?: string;
+  speakerInfo?: string;
+  
+  // COURSE MATERIAL
+  learningObjectives?: string;
+  prerequisites?: string;
+  
+  // POLICY & DOCUMENTS
+  policyType?: string;
+  policyName?: string;
+  policyContent?: string;
+  
+  // FORMS
+  formDescription?: string;
+  formLink?: string;
+  
+  // DASHBOARDS
+  dashboardName?: string;
+  dashboardLink?: string;
+  dashboardDescription?: string;
+  dashboardSop?: string;
+  dashboardVisibility?: string;
 }
 
 export interface DashboardStats {
@@ -79,7 +124,8 @@ export interface DashboardData {
 }
 
 export interface ContentDetails extends ContentItem {
-  targetStudents?: string;
+  // ContentDetails now inherits all fields including category-specific ones from ContentItem
+  // No additional fields needed as targetStudents is now in base ContentItem
 }
 
 export interface ApiResponse<T> {
@@ -105,11 +151,18 @@ class ApiService {
       const response = await fetch(`${BACKEND_URL}?${queryParams}`, {
         method: 'GET',
         mode: 'cors',
+        redirect: 'follow', // Explicitly follow redirects
         // Remove Content-Type header to avoid preflight request
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+      }
+
+      // Check if response is HTML (redirect page)
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('text/html')) {
+        throw new Error('Received HTML response instead of JSON - possible redirect issue');
       }
 
       const result = await response.json();
@@ -204,9 +257,34 @@ class ApiService {
 
   // Get dashboard links
   async getDashboardLinks(studentEmail: string): Promise<ApiResponse<Array<{name: string, link: string, description: string, type: string, category?: string, eventType?: string}>>> {
-    return this.makeRequest('getDashboardLinks', {
+    console.log('API Service: Getting dashboard links for:', studentEmail);
+    const result = await this.makeRequest<Array<{name: string, link: string, description: string, type: string, category?: string, eventType?: string}>>('getDashboardLinks', {
       studentEmail
     });
+    console.log('API Service: Dashboard links result:', result);
+    return result;
+  }
+
+  // Get student schedule/calendar
+  async getStudentSchedule(studentEmail: string, startDate?: string, endDate?: string): Promise<ApiResponse<ContentItem[]>> {
+    console.log('API Service: Getting schedule for:', studentEmail);
+    const result = await this.makeRequest<ContentItem[]>('getStudentSchedule', {
+      studentEmail,
+      startDate,
+      endDate
+    });
+    console.log('API Service: Schedule result:', result);
+    return result;
+  }
+
+  // Get policies and documents
+  async getPoliciesAndDocuments(studentEmail: string): Promise<ApiResponse<ContentItem[]>> {
+    console.log('API Service: Getting policies and documents for:', studentEmail);
+    const result = await this.makeRequest<ContentItem[]>('getPoliciesAndDocuments', {
+      studentEmail
+    });
+    console.log('API Service: Policies and documents result:', result);
+    return result;
   }
 
   // Upload profile picture

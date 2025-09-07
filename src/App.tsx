@@ -11,6 +11,7 @@ import Assignments from './pages/Assignments';
 import Announcements from './pages/Announcements';
 import Resources from './pages/Resources';
 import Calendar from './pages/Calendar';
+import Policies from './pages/Policies';
 import Profile from './pages/Profile';
 
 function App() {
@@ -75,6 +76,7 @@ function App() {
             <Route path="announcements" element={<Announcements />} />
             <Route path="resources" element={<Resources />} />
             <Route path="calendar" element={<Calendar />} />
+            <Route path="policies" element={<Policies />} />
             <Route path="profile" element={<Profile />} />
           </Route>
         </Routes>

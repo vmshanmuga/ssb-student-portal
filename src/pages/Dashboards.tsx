@@ -8,7 +8,9 @@ import {
   TrendingUp, 
   ExternalLink,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  CheckCircle,
+  X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -19,11 +21,17 @@ interface DashboardLink {
   type: string;
   category?: string;
   eventType?: string;
+  visibility?: string;
+  sop?: string;
+  status?: string;
+  priority?: string;
 }
 
 const Dashboards: React.FC = () => {
   const [dashboards, setDashboards] = useState<DashboardLink[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [selectedDashboard, setSelectedDashboard] = useState<DashboardLink | null>(null);
   const user = auth.currentUser;
 
   useEffect(() => {
@@ -31,13 +39,17 @@ const Dashboards: React.FC = () => {
       if (!user?.email) return;
       
       try {
+        console.log('Fetching dashboards for user:', user.email);
         const result = await apiService.getDashboardLinks(user.email);
         
+        console.log('Dashboard API response:', result);
+        
         if (result.success) {
+          console.log('Dashboards found:', result.data?.length || 0);
           setDashboards(result.data || []);
         } else {
           console.error('Failed to fetch dashboards:', result.error);
-          toast.error('Failed to load dashboards');
+          toast.error('Failed to load dashboards: ' + (result.error || 'Unknown error'));
         }
       } catch (error) {
         console.error('Error fetching dashboards:', error);
@@ -52,34 +64,82 @@ const Dashboards: React.FC = () => {
 
   const getDashboardIcon = (type: string) => {
     switch (type) {
-      case 'academic': return <LayoutDashboard className="w-8 h-8" />;
-      case 'assignment': return <ClipboardList className="w-8 h-8" />;
-      case 'attendance': return <Calendar className="w-8 h-8" />;
-      case 'mentorship': return <Users className="w-8 h-8" />;
-      case 'placement': return <TrendingUp className="w-8 h-8" />;
-      default: return <LayoutDashboard className="w-8 h-8" />;
+      case 'academic': return (
+        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 3L1 9L12 15L21 12V17H23V9L12 3ZM5 13.18V17.18L12 21L19 17.18V13.18L12 17L5 13.18Z"/>
+        </svg>
+      );
+      case 'assignment': return <ClipboardList className="w-6 h-6" />;
+      case 'attendance': return <Calendar className="w-6 h-6" />;
+      case 'mentorship': return <Users className="w-6 h-6" />;
+      case 'placement': return <TrendingUp className="w-6 h-6" />;
+      default: return <LayoutDashboard className="w-6 h-6" />;
     }
   };
 
   const getDashboardColor = (type: string) => {
     switch (type) {
-      case 'academic': return 'from-blue-500 to-blue-600';
-      case 'assignment': return 'from-green-500 to-green-600';
-      case 'attendance': return 'from-purple-500 to-purple-600';
-      case 'mentorship': return 'from-orange-500 to-orange-600';
-      case 'placement': return 'from-red-500 to-red-600';
-      default: return 'from-gray-500 to-gray-600';
+      case 'academic': return {
+        gradient: 'from-emerald-50 to-green-50',
+        border: 'border-emerald-200',
+        icon: 'text-emerald-700',
+        accent: 'bg-[#1d8f5b]',
+        iconBg: 'bg-emerald-50'
+      };
+      case 'assignment': return {
+        gradient: 'from-yellow-50 to-amber-50',
+        border: 'border-yellow-200',
+        icon: 'text-amber-700',
+        accent: 'bg-[#ffc300]',
+        iconBg: 'bg-yellow-50'
+      };
+      case 'attendance': return {
+        gradient: 'from-slate-50 to-gray-50',
+        border: 'border-slate-200',
+        icon: 'text-slate-700',
+        accent: 'bg-[#3a3a3a]',
+        iconBg: 'bg-slate-50'
+      };
+      case 'mentorship': return {
+        gradient: 'from-orange-50 to-orange-100',
+        border: 'border-orange-200',
+        icon: 'text-orange-700',
+        accent: 'bg-orange-500',
+        iconBg: 'bg-orange-50'
+      };
+      case 'placement': return {
+        gradient: 'from-red-50 to-red-100',
+        border: 'border-red-200',
+        icon: 'text-red-700',
+        accent: 'bg-red-500',
+        iconBg: 'bg-red-50'
+      };
+      default: return {
+        gradient: 'from-gray-50 to-gray-100',
+        border: 'border-gray-200',
+        icon: 'text-gray-600',
+        accent: 'bg-gray-500',
+        iconBg: 'bg-gray-50'
+      };
     }
   };
 
   const handleDashboardClick = (dashboard: DashboardLink) => {
-    const proceed = window.confirm(
-      'Make sure this browser only has ssb.scaler.com Gmail account logged in to avoid any errors.\n\nClick OK to continue to the dashboard.'
-    );
-    
-    if (proceed) {
-      window.open(dashboard.link, '_blank');
+    setSelectedDashboard(dashboard);
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmAccess = () => {
+    if (selectedDashboard) {
+      window.open(selectedDashboard.link, '_blank');
+      setShowConfirmDialog(false);
+      setSelectedDashboard(null);
     }
+  };
+
+  const handleCancelAccess = () => {
+    setShowConfirmDialog(false);
+    setSelectedDashboard(null);
   };
 
   if (loading) {
@@ -110,40 +170,112 @@ const Dashboards: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {dashboards.map((dashboard, index) => (
-            <div
-              key={index}
-              onClick={() => handleDashboardClick(dashboard)}
-              className="bg-card hover:bg-accent/50 border border-border rounded-lg p-6 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 group"
-            >
-              <div className="flex items-start space-x-4">
-                <div className={`bg-gradient-to-r ${getDashboardColor(dashboard.type)} p-3 rounded-lg text-white group-hover:scale-110 transition-transform duration-200`}>
-                  {getDashboardIcon(dashboard.type)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-foreground truncate">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {dashboards.map((dashboard, index) => {
+            const colors = getDashboardColor(dashboard.type);
+            const isRestricted = dashboard.visibility === 'Restricted';
+            
+            return (
+              <div
+                key={index}
+                onClick={() => isRestricted ? null : handleDashboardClick(dashboard)}
+                className={`
+                  relative overflow-hidden rounded-xl border-2 ${colors.border} 
+                  bg-gradient-to-br ${colors.gradient}
+                  ${isRestricted ? 'cursor-not-allowed opacity-75' : 'cursor-pointer hover:shadow-xl hover:scale-[1.02] hover:-translate-y-1'} 
+                  transition-all duration-300 
+                  group
+                `}
+              >
+                {/* Priority indicator */}
+                {dashboard.priority === 'High' && (
+                  <div className="absolute top-4 right-4">
+                    <div className={`w-3 h-3 rounded-full ${colors.accent} shadow-lg`}></div>
+                  </div>
+                )}
+                
+                {/* Card content */}
+                <div className="p-6">
+                  {/* Header section */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={`
+                      flex items-center justify-center w-12 h-12 rounded-xl
+                      ${colors.iconBg} border border-white/50 shadow-lg ${colors.icon}
+                      group-hover:scale-110 group-hover:rotate-3 transition-all duration-300
+                    `}>
+                      {getDashboardIcon(dashboard.type)}
+                    </div>
+                    <ExternalLink className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors duration-200" />
+                  </div>
+
+                  {/* Title and category */}
+                  <div className="space-y-2 mb-4">
+                    <h3 className="text-xl font-bold text-[#3a3a3a] group-hover:text-black transition-colors">
                       {dashboard.name}
                     </h3>
-                    <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    {dashboard.category && (
+                      <div className="flex items-center space-x-2">
+                        <span className={`
+                          inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold
+                          ${colors.accent} text-white shadow-sm
+                        `}>
+                          {dashboard.category}
+                        </span>
+                        {dashboard.status && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-green-100 text-green-800">
+                            {dashboard.status}
+                          </span>
+                        )}
+                        {isRestricted && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-red-100 text-red-800 border border-red-200">
+                            🔒 Restricted
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Description - Blurred if restricted */}
                   {dashboard.description && (
-                    <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                    <p className={`text-sm text-[#3a3a3a]/80 leading-relaxed mb-4 min-h-[3rem] line-clamp-3 ${
+                      isRestricted ? 'blur-sm select-none' : ''
+                    }`}>
                       {dashboard.description}
                     </p>
                   )}
-                  {dashboard.category && (
-                    <div className="mt-3">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                        {dashboard.category}
+
+                  {/* SOP indicator - Blurred if restricted */}
+                  {dashboard.sop && (
+                    <div className={`flex items-center space-x-2 pt-2 border-t border-white/50 ${
+                      isRestricted ? 'blur-sm select-none' : ''
+                    }`}>
+                      <AlertCircle className="w-4 h-4 text-[#3a3a3a]/60" />
+                      <span className="text-xs text-[#3a3a3a]/70 font-medium">
+                        Standard Operating Procedure Available
                       </span>
                     </div>
                   )}
+
+                  {/* Restricted access overlay */}
+                  {isRestricted && (
+                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center pointer-events-none">
+                      <div className="bg-white/90 backdrop-blur-sm rounded-lg p-3 text-center shadow-lg border border-red-200">
+                        <div className="text-red-600 text-2xl mb-1">🔒</div>
+                        <p className="text-xs font-medium text-red-800">Access Restricted</p>
+                        <p className="text-xs text-red-600">Contact Administrator</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hover effect overlay */}
+                  <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                 </div>
+
+                {/* Bottom accent line */}
+                <div className={`h-1 ${colors.accent} transform scale-x-0 ${!isRestricted ? 'group-hover:scale-x-100' : ''} transition-transform duration-300 origin-left`}></div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -159,6 +291,107 @@ const Dashboards: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Custom Confirmation Dialog */}
+      {showConfirmDialog && selectedDashboard && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all border border-gray-200">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className={`
+                    flex items-center justify-center w-12 h-12 rounded-xl border 
+                    ${getDashboardColor(selectedDashboard.type).iconBg} 
+                    ${getDashboardColor(selectedDashboard.type).border} 
+                    ${getDashboardColor(selectedDashboard.type).icon}
+                  `}>
+                    {getDashboardIcon(selectedDashboard.type)}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-[#3a3a3a]">{selectedDashboard.name}</h3>
+                    <p className="text-sm text-[#3a3a3a]/70">{selectedDashboard.category || 'Dashboard Access'}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleCancelAccess}
+                  className="text-[#3a3a3a]/60 hover:text-[#3a3a3a] transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="space-y-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-medium text-amber-800">
+                        Authentication Required
+                      </h4>
+                      <p className="text-sm text-amber-700 mt-1">
+                        Please ensure you're logged into your <strong>SSB Scaler Gmail account</strong> (@ssb.scaler.com) 
+                        in this browser to avoid authentication errors.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedDashboard.description && (
+                  <div className="bg-[#f4f4f4] rounded-lg p-4 border border-gray-200">
+                    <h4 className="text-sm font-medium text-[#3a3a3a] mb-2">About this Dashboard</h4>
+                    <p className="text-sm text-[#3a3a3a]/80">{selectedDashboard.description}</p>
+                  </div>
+                )}
+
+                {selectedDashboard.sop && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="w-4 h-4 text-[#1d8f5b]" />
+                      <span className="text-sm font-medium text-emerald-800">
+                        Standard Operating Procedure
+                      </span>
+                    </div>
+                    <div className="mt-2">
+                      {selectedDashboard.sop.startsWith('http') ? (
+                        <a 
+                          href={selectedDashboard.sop} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-sm text-[#1d8f5b] hover:text-emerald-800 underline decoration-dotted flex items-center space-x-1"
+                        >
+                          <span>View SOP Documentation</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ) : (
+                        <p className="text-sm text-emerald-700">{selectedDashboard.sop}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={handleCancelAccess}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-[#3a3a3a] bg-[#f4f4f4] hover:bg-gray-200 rounded-lg transition-colors border border-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmAccess}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-black bg-[#ffc300] hover:bg-[#e6b000] rounded-lg transition-colors flex items-center justify-center space-x-2 shadow-md hover:shadow-lg"
+                >
+                  <span>Continue to Dashboard</span>
+                  <ExternalLink className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

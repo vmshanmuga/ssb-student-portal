@@ -43,6 +43,12 @@ function doOptions(e) {
 
 function handleRequest(e) {
   try {
+    // Handle undefined event parameter
+    if (!e) {
+      Logger.log('Error: Event parameter is undefined');
+      return createErrorResponse('Invalid request - no parameters received');
+    }
+    
     // Handle OPTIONS preflight request
     if (e.parameter && e.parameter.method === 'OPTIONS') {
       return doOptions(e);
@@ -124,6 +130,12 @@ function handleRequest(e) {
       case 'getDashboardLinks':
         result = getDashboardLinks(studentEmail);
         break;
+      case 'getStudentSchedule':
+        result = getStudentSchedule(studentEmail, params.startDate, params.endDate);
+        break;
+      case 'getPoliciesAndDocuments':
+        result = getPoliciesAndDocuments(studentEmail);
+        break;
       default:
         return createErrorResponse('Unknown action: ' + action);
     }
@@ -180,7 +192,8 @@ function getStudentDashboard(studentEmail, lastSync) {
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(MAIN_SHEET);
     const data = sheet.getDataRange().getValues();
     
-    if (data.length <= 1) {
+    if (data.length <= 2) {
+      Logger.log('Not enough data in sheet - need at least headers and one data row');
       return {
         success: true,
         data: {
@@ -196,17 +209,25 @@ function getStudentDashboard(studentEmail, lastSync) {
       };
     }
 
-    const headers = data[0];
+    // Headers are in row 2 (index 1), data starts from row 3 (index 2)
+    const headers = data[1];
     const indices = getColumnIndices(headers);
     const now = new Date();
     const lastSyncDate = lastSync ? new Date(lastSync) : null;
     
+    Logger.log(`Student Dashboard - Headers: ${headers.length} columns, Data rows: ${data.length - 2}`);
+    Logger.log(`Column indices mapped: ${Object.keys(indices).length} fields`);
+    
     const filteredContent = [];
     const stats = { total: 0, active: 0, upcoming: 0, requiresAck: 0 };
 
-    // Process each content item
-    for (let i = 1; i < data.length; i++) {
+    // Process each content item (start from row 3 = index 2)
+    for (let i = 2; i < data.length; i++) {
       const row = data[i];
+      
+      // Skip unpublished content
+      const publish = getValue(row, indices.publish);
+      if (publish !== 'Yes') continue;
       
       // Calculate current status
       const startDateTime = parseDateTime(getValue(row, indices.startDateTime));
@@ -236,23 +257,73 @@ function getStudentDashboard(studentEmail, lastSync) {
         continue;
       }
 
-      // Create content item for dashboard
+      // Create base content item for dashboard
       const contentItem = {
         id: getValue(row, indices.id),
         category: getValue(row, indices.category),
         eventType: getValue(row, indices.eventType),
         title: getValue(row, indices.title),
         subTitle: getValue(row, indices.subTitle),
+        content: getValue(row, indices.content),
         priority: getValue(row, indices.priority),
         status: currentStatus,
+        term: getValue(row, indices.term),
+        subject: getValue(row, indices.subject),
+        groups: getValue(row, indices.groups),
+        postedBy: getValue(row, indices.postedBy),
         createdAt: formatDisplayDateTime(getValue(row, indices.createdAt)),
         startDateTime: formatDisplayDateTime(getValue(row, indices.startDateTime)),
         endDateTime: formatDisplayDateTime(getValue(row, indices.endDateTime)),
+        targetBatch: getValue(row, indices.targetBatch),
         requiresAcknowledgment: getValue(row, indices.requireAcknowledgment) === 'Yes',
+        driveLink: getValue(row, indices.driveLink),
+        sheetsLink: getValue(row, indices.sheetsLink),
         hasFiles: !!getValue(row, indices.fileURL),
         isNew: lastSyncDate && createdAt > lastSyncDate,
         daysUntilDeadline: endDateTime ? Math.ceil((endDateTime - now) / (1000 * 60 * 60 * 24)) : null
       };
+
+      // Add category-specific fields based on category
+      const category = getValue(row, indices.category);
+      
+      switch (category) {
+        case 'ASSIGNMENTS & TASKS':
+          contentItem.instructions = getValue(row, indices.instructions);
+          contentItem.maxPoints = getValue(row, indices.maxPoints);
+          contentItem.submissionGuidelines = getValue(row, indices.submissionGuidelines);
+          contentItem.rubricLink = getValue(row, indices.rubricLink);
+          contentItem.groupSize = getValue(row, indices.groupSize);
+          break;
+          
+        case 'ANNOUNCEMENTS':
+          contentItem.messageDetails = getValue(row, indices.messageDetails);
+          contentItem.callToAction = getValue(row, indices.callToAction);
+          contentItem.readTracking = getValue(row, indices.readTracking);
+          break;
+          
+        case 'EVENTS':
+          contentItem.eventTitle = getValue(row, indices.eventTitle);
+          contentItem.eventLocation = getValue(row, indices.eventLocation);
+          contentItem.eventAgenda = getValue(row, indices.eventAgenda);
+          contentItem.speakerInfo = getValue(row, indices.speakerInfo);
+          break;
+          
+        case 'COURSE MATERIAL':
+          contentItem.learningObjectives = getValue(row, indices.learningObjectives);
+          contentItem.prerequisites = getValue(row, indices.prerequisites);
+          break;
+          
+        case 'POLICY & DOCUMENTS':
+          contentItem.policyType = getValue(row, indices.policyType);
+          contentItem.policyName = getValue(row, indices.policyName);
+          contentItem.policyContent = getValue(row, indices.policyContent);
+          break;
+          
+        case 'FORMS':
+          contentItem.formDescription = getValue(row, indices.formDescription);
+          contentItem.formLink = getValue(row, indices.formLink);
+          break;
+      }
 
       filteredContent.push(contentItem);
       
@@ -308,11 +379,23 @@ function getContentDetails(contentId, studentEmail) {
     // Get content from main sheet
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(MAIN_SHEET);
     const data = sheet.getDataRange().getValues();
-    const headers = data[0];
+    
+    if (data.length <= 2) {
+      Logger.log('Not enough data in sheet for content details');
+      return {
+        success: false,
+        error: 'No content data found'
+      };
+    }
+    
+    // Headers are in row 2 (index 1), data starts from row 3 (index 2)
+    const headers = data[1];
     const indices = getColumnIndices(headers);
     
-    // Find the content item
-    for (let i = 1; i < data.length; i++) {
+    Logger.log(`Content Details - Headers: ${headers.length} columns, Data rows: ${data.length - 2}`);
+    
+    // Find the content item (start from row 3 = index 2)
+    for (let i = 2; i < data.length; i++) {
       if (data[i][indices.id] === contentId) {
         const row = data[i];
         
@@ -339,6 +422,7 @@ function getContentDetails(contentId, studentEmail) {
           name: extractFileNameFromUrl(url.trim())
         })).filter(file => file.url) : [];
 
+        // Create base content details
         const contentDetails = {
           id: getValue(row, indices.id),
           category: getValue(row, indices.category),
@@ -348,17 +432,75 @@ function getContentDetails(contentId, studentEmail) {
           content: getValue(row, indices.content),
           priority: getValue(row, indices.priority),
           status: currentStatus,
+          term: getValue(row, indices.term),
+          domain: getValue(row, indices.domain),
+          subject: getValue(row, indices.subject),
+          groups: getValue(row, indices.groups),
           postedBy: getValue(row, indices.postedBy),
           createdAt: formatDisplayDateTime(getValue(row, indices.createdAt)),
+          editedAt: formatDisplayDateTime(getValue(row, indices.editedAt)),
+          editedBy: getValue(row, indices.editedBy),
           startDateTime: formatDisplayDateTime(getValue(row, indices.startDateTime)),
           endDateTime: formatDisplayDateTime(getValue(row, indices.endDateTime)),
           targetBatch: getValue(row, indices.targetBatch),
+          targetStudents: getValue(row, indices.targetStudents),
           requiresAcknowledgment: getValue(row, indices.requireAcknowledgment) === 'Yes',
           driveLink: getValue(row, indices.driveLink),
           sheetsLink: getValue(row, indices.sheetsLink),
+          fileuploadLink: getValue(row, indices.fileuploadLink),
           files: files,
           daysUntilDeadline: endDateTime ? Math.ceil((endDateTime - new Date()) / (1000 * 60 * 60 * 24)) : null
         };
+
+        // Add category-specific fields based on category
+        const category = getValue(row, indices.category);
+        
+        switch (category) {
+          case 'ASSIGNMENTS & TASKS':
+            contentDetails.instructions = getValue(row, indices.instructions);
+            contentDetails.maxPoints = getValue(row, indices.maxPoints);
+            contentDetails.submissionGuidelines = getValue(row, indices.submissionGuidelines);
+            contentDetails.rubricLink = getValue(row, indices.rubricLink);
+            contentDetails.groupSize = getValue(row, indices.groupSize);
+            break;
+            
+          case 'ANNOUNCEMENTS':
+            contentDetails.messageDetails = getValue(row, indices.messageDetails);
+            contentDetails.callToAction = getValue(row, indices.callToAction);
+            contentDetails.readTracking = getValue(row, indices.readTracking);
+            break;
+            
+          case 'EVENTS':
+            contentDetails.eventTitle = getValue(row, indices.eventTitle);
+            contentDetails.eventLocation = getValue(row, indices.eventLocation);
+            contentDetails.eventAgenda = getValue(row, indices.eventAgenda);
+            contentDetails.speakerInfo = getValue(row, indices.speakerInfo);
+            break;
+            
+          case 'COURSE MATERIAL':
+            contentDetails.learningObjectives = getValue(row, indices.learningObjectives);
+            contentDetails.prerequisites = getValue(row, indices.prerequisites);
+            break;
+            
+          case 'POLICY & DOCUMENTS':
+            contentDetails.policyType = getValue(row, indices.policyType);
+            contentDetails.policyName = getValue(row, indices.policyName);
+            contentDetails.policyContent = getValue(row, indices.policyContent);
+            break;
+            
+          case 'FORMS':
+            contentDetails.formDescription = getValue(row, indices.formDescription);
+            contentDetails.formLink = getValue(row, indices.formLink);
+            break;
+            
+          case 'DASHBOARDS':
+            contentDetails.dashboardName = getValue(row, indices.dashboardName);
+            contentDetails.dashboardLink = getValue(row, indices.dashboardLink);
+            contentDetails.dashboardDescription = getValue(row, indices.dashboardDescription);
+            contentDetails.dashboardSop = getValue(row, indices.dashboardSop);
+            contentDetails.dashboardVisibility = getValue(row, indices.dashboardVisibility);
+            break;
+        }
 
         Logger.log('Content details retrieved: ' + contentId);
         return {
@@ -515,7 +657,8 @@ function getStudentProfile(studentEmail) {
           email: row[0],
           fullName: row[1] || '',
           rollNo: row[2] || '',
-          batch: row[3] || ''
+          batch: row[3] || '',
+          options: [] // Initialize empty options array to prevent errors
         };
 
         return {
@@ -927,7 +1070,7 @@ function uploadToImgBB(imageData, fileName) {
  * @return {Object} Upload result with public URL
  */
 /**
- * Get dashboard links for student based on their access
+ * Get dashboard links for student - specifically from DASHBOARDS category
  * @param {string} studentEmail Student email
  * @return {Object} Dashboard links data
  */
@@ -938,6 +1081,7 @@ function getDashboardLinks(studentEmail) {
     // Get student profile for batch info
     const studentProfile = getStudentProfile(studentEmail);
     if (!studentProfile.success) {
+      Logger.log(`Student profile not found for: ${studentEmail}`);
       return {
         success: false,
         error: 'Student profile not found'
@@ -945,52 +1089,103 @@ function getDashboardLinks(studentEmail) {
     }
     
     const student = studentProfile.data;
+    Logger.log(`Student found - Batch: ${student.batch}, Name: ${student.fullName}`);
     
     // Get dashboard data from main sheet
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(MAIN_SHEET);
     const data = sheet.getDataRange().getValues();
-    const headers = data[0];
+    
+    if (data.length <= 2) {
+      Logger.log('Not enough data in sheet - need at least headers and one data row');
+      return {
+        success: true,
+        data: []
+      };
+    }
+    
+    // Headers are in row 2 (index 1), data starts from row 3 (index 2)
+    const headers = data[1];
     const indices = getColumnIndices(headers);
+    
+    Logger.log(`Headers found: ${headers.length} columns`);
+    Logger.log(`Column indices mapped: ${Object.keys(indices).length} fields`);
     
     const dashboards = [];
     
-    // Process each row looking for dashboard entries
-    for (let i = 1; i < data.length; i++) {
+    Logger.log(`Processing ${data.length - 2} data rows for dashboard entries`);
+    
+    // Process each row looking for DASHBOARDS category entries (start from row 3 = index 2)
+    for (let i = 2; i < data.length; i++) {
       const row = data[i];
       
-      // Check if this row has dashboard data (either static or dashboard-specific columns)
+      // Check if this is a DASHBOARDS category entry
+      const category = getValue(row, indices.category);
+      Logger.log(`Row ${i}: Category = "${category}"`);
+      if (category !== 'DASHBOARDS') continue;
+      
+      Logger.log(`Found DASHBOARDS row ${i}`);
+      
+      // Check if published
+      const publish = getValue(row, indices.publish);
+      Logger.log(`Row ${i}: Publish = "${publish}"`);
+      if (publish !== 'Yes') continue;
+      
+      Logger.log(`Row ${i}: Passed publish check`);
+      
+      // Get dashboard-specific data
       const dashboardName = getValue(row, indices.dashboardName) || getValue(row, indices.title);
       const dashboardLink = getValue(row, indices.dashboardLink) || getValue(row, indices.driveLink) || getValue(row, indices.sheetsLink);
-      const category = getValue(row, indices.category);
-      const eventType = getValue(row, indices.eventType);
+      const dashboardDescription = getValue(row, indices.dashboardDescription) || getValue(row, indices.content);
+      const dashboardVisibility = getValue(row, indices.dashboardVisibility);
+      const dashboardSop = getValue(row, indices.dashboardSop);
       
-      // Only include rows that are dashboard-related
+      // Skip if no name or link
       if (!dashboardName || !dashboardLink) continue;
       
-      // Filter for dashboard entries (check if category or event type indicates dashboard)
-      const isDashboard = (category && category.toLowerCase().includes('dashboard')) || 
-                         (eventType && eventType.toLowerCase().includes('dashboard')) ||
-                         (dashboardName.toLowerCase().includes('dashboard'));
-      
-      if (!isDashboard) continue;
+      // Check visibility settings
+      if (dashboardVisibility && dashboardVisibility.toLowerCase() === 'hidden') continue;
       
       // Check if student has access to this dashboard
       const targetBatch = getValue(row, indices.targetBatch);
       const targetStudents = getValue(row, indices.targetStudents);
       
+      Logger.log(`Row ${i}: Target Batch = "${targetBatch}", Student Batch = "${student.batch}"`);
+      Logger.log(`Row ${i}: Target Students = "${targetStudents}"`);
+      
       if (isContentTargetedToStudent(targetBatch, targetStudents, student)) {
-        dashboards.push({
-          name: dashboardName,
-          link: dashboardLink,
-          description: getValue(row, indices.dashboardDescription) || getValue(row, indices.content) || '',
-          type: getDashboardType(dashboardName),
-          category: category,
-          eventType: eventType
-        });
+        Logger.log(`Row ${i}: Passed targeting check`);
+        // Calculate current status for dashboard availability
+        const startDateTime = parseDateTime(getValue(row, indices.startDateTime));
+        const endDateTime = parseDateTime(getValue(row, indices.endDateTime));
+        const currentStatus = calculateContentStatus(startDateTime, endDateTime);
+        
+        // Only include active or upcoming dashboards
+        if (currentStatus === 'Active' || currentStatus === 'Upcoming') {
+          dashboards.push({
+            name: dashboardName,
+            link: dashboardLink,
+            description: dashboardDescription || '',
+            type: getDashboardType(dashboardName),
+            category: category,
+            eventType: getValue(row, indices.eventType) || 'dashboard',
+            visibility: dashboardVisibility || 'public',
+            sop: dashboardSop || '',
+            status: currentStatus,
+            priority: getValue(row, indices.priority) || 'Medium'
+          });
+        }
       }
     }
     
-    Logger.log(`Found ${dashboards.length} dashboards for ${studentEmail}`);
+    // Sort dashboards by priority (High -> Medium -> Low) and then by name
+    dashboards.sort((a, b) => {
+      const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
+      const priorityDiff = (priorityOrder[b.priority] || 2) - (priorityOrder[a.priority] || 2);
+      if (priorityDiff !== 0) return priorityDiff;
+      return a.name.localeCompare(b.name);
+    });
+    
+    Logger.log(`Found ${dashboards.length} dashboard links for ${studentEmail}`);
     
     return {
       success: true,
@@ -1002,6 +1197,418 @@ function getDashboardLinks(studentEmail) {
     return {
       success: false,
       error: 'Failed to get dashboard links: ' + error.message
+    };
+  }
+}
+
+/**
+ * Get student schedule/calendar data - specifically from CLASS/SESSION SCHEDULE category
+ * @param {string} studentEmail Student email
+ * @param {string} startDate Optional start date filter (YYYY-MM-DD)
+ * @param {string} endDate Optional end date filter (YYYY-MM-DD)
+ * @return {Object} Schedule data
+ */
+function getStudentSchedule(studentEmail, startDate, endDate) {
+  try {
+    Logger.log(`Getting schedule for: ${studentEmail}`);
+    
+    // Get student profile for batch info
+    const studentProfile = getStudentProfile(studentEmail);
+    if (!studentProfile.success) {
+      Logger.log(`Student profile not found for: ${studentEmail}`);
+      return {
+        success: false,
+        error: 'Student profile not found'
+      };
+    }
+    
+    const student = studentProfile.data;
+    Logger.log(`Student found - Batch: ${student.batch}, Name: ${student.fullName}`);
+    
+    // Get schedule data from main sheet
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(MAIN_SHEET);
+    const data = sheet.getDataRange().getValues();
+    
+    if (data.length <= 2) {
+      Logger.log('Not enough data in sheet - need at least headers and one data row');
+      return {
+        success: true,
+        data: []
+      };
+    }
+    
+    // Headers are in row 2 (index 1), data starts from row 3 (index 2)
+    const headers = data[1];
+    const indices = getColumnIndices(headers);
+    
+    Logger.log(`Headers found: ${headers.length} columns`);
+    Logger.log(`Column indices mapped: ${Object.keys(indices).length} fields`);
+    
+    const scheduleItems = [];
+    const now = new Date();
+    
+    // Parse date filters if provided
+    const filterStartDate = startDate ? new Date(startDate) : null;
+    const filterEndDate = endDate ? new Date(endDate) : null;
+    
+    Logger.log(`Processing ${data.length - 2} data rows for schedule entries`);
+    
+    // Process each row looking for entries with dates (start from row 3 = index 2)
+    for (let i = 2; i < data.length; i++) {
+      const row = data[i];
+      
+      // Get category and check if it has meaningful dates
+      const category = getValue(row, indices.category);
+      Logger.log(`Row ${i}: Category = "${category}"`);
+      
+      // Skip entries without valid categories
+      if (!category) continue;
+      
+      // Skip categories that don't belong in calendar view
+      const nonCalendarCategories = ['DASHBOARDS', 'POLICY & DOCUMENTS'];
+      if (nonCalendarCategories.includes(category)) {
+        Logger.log(`Row ${i}: Skipping non-calendar category: ${category}`);
+        continue;
+      }
+      
+      // Get start and end date times to check if this entry should appear in calendar
+      const startDateTimeValue = getValue(row, indices.startDateTime);
+      const endDateTimeValue = getValue(row, indices.endDateTime);
+      
+      // Skip entries without dates (no point showing them in calendar)
+      if (!startDateTimeValue && !endDateTimeValue) {
+        Logger.log(`Row ${i}: Skipping - no dates provided`);
+        continue;
+      }
+      
+      Logger.log(`Found calendar entry: ${category} row ${i}`);
+      
+      // Check if published
+      const publish = getValue(row, indices.publish);
+      Logger.log(`Row ${i}: Publish = "${publish}"`);
+      if (publish !== 'Yes') continue;
+      
+      Logger.log(`Row ${i}: Passed publish check`);
+      
+      // Check if student has access to this schedule item
+      const targetBatch = getValue(row, indices.targetBatch);
+      const targetStudents = getValue(row, indices.targetStudents);
+      
+      Logger.log(`Row ${i}: Target Batch = "${targetBatch}", Student Batch = "${student.batch}"`);
+      
+      if (isContentTargetedToStudent(targetBatch, targetStudents, student)) {
+        Logger.log(`Row ${i}: Passed targeting check`);
+        
+        // Get schedule timing
+        const startDateTime = parseDateTime(startDateTimeValue);
+        const endDateTime = parseDateTime(endDateTimeValue);
+        
+        // Apply date filters if provided
+        if (filterStartDate && startDateTime && startDateTime < filterStartDate) continue;
+        if (filterEndDate && startDateTime && startDateTime > filterEndDate) continue;
+        
+        // Calculate current status for schedule item
+        const currentStatus = calculateContentStatus(startDateTime, endDateTime);
+        
+        // Map categories to display categories and determine eventType
+        let displayCategory = category;
+        let defaultEventType = 'general';
+        
+        switch (category) {
+          case 'CLASS/SESSION SCHEDULE': 
+            defaultEventType = 'class'; 
+            break;
+          case 'ASSIGNMENTS & TASKS': 
+            defaultEventType = 'assignment'; 
+            break;
+          case 'EVENTS': 
+            displayCategory = 'Events & Announcements';
+            defaultEventType = 'event'; 
+            break;
+          case 'ANNOUNCEMENTS': 
+            displayCategory = 'Events & Announcements';
+            defaultEventType = 'announcement'; 
+            break;
+          case 'FORMS': 
+            defaultEventType = 'form'; 
+            break;
+          case 'COURSE MATERIAL': 
+            displayCategory = 'Resource';
+            defaultEventType = 'resource'; 
+            break;
+          default: 
+            defaultEventType = 'general'; 
+            break;
+        }
+        
+        // Determine title with category-specific fallbacks
+        let itemTitle = getValue(row, indices.title);
+        if (!itemTitle) {
+          switch (category) {
+            case 'EVENTS':
+              itemTitle = getValue(row, indices.eventTitle);
+              break;
+            default:
+              itemTitle = 'Untitled';
+              break;
+          }
+        }
+        // Final fallback
+        if (!itemTitle) itemTitle = 'Untitled';
+
+        // Create schedule item
+        const scheduleItem = {
+          id: getValue(row, indices.id),
+          category: displayCategory,
+          originalCategory: category, // Keep original for category-specific fields
+          eventType: getValue(row, indices.eventType) || defaultEventType,
+          title: itemTitle,
+          subTitle: getValue(row, indices.subTitle),
+          content: getValue(row, indices.content),
+          domain: getValue(row, indices.domain),
+          subject: getValue(row, indices.subject),
+          groups: getValue(row, indices.groups),
+          postedBy: getValue(row, indices.postedBy),
+          startDateTime: startDateTime ? startDateTime.toISOString() : null,
+          endDateTime: endDateTime ? endDateTime.toISOString() : null,
+          startDateTimeRaw: startDateTime, // Keep raw date for sorting
+          endDateTimeRaw: endDateTime,
+          targetBatch: getValue(row, indices.targetBatch),
+          term: getValue(row, indices.term),
+          priority: getValue(row, indices.priority) || 'Medium',
+          status: currentStatus,
+          driveLink: getValue(row, indices.driveLink),
+          sheetsLink: getValue(row, indices.sheetsLink),
+          requiresAcknowledgment: getValue(row, indices.requireAcknowledgment) === 'Yes',
+          createdAt: formatDisplayDateTime(getValue(row, indices.createdAt))
+        };
+        
+        // Add category-specific fields for better calendar display
+        switch (scheduleItem.originalCategory) {
+          case 'ASSIGNMENTS & TASKS':
+            scheduleItem.instructions = getValue(row, indices.instructions);
+            scheduleItem.maxPoints = getValue(row, indices.maxPoints);
+            scheduleItem.submissionGuidelines = getValue(row, indices.submissionGuidelines);
+            scheduleItem.groupSize = getValue(row, indices.groupSize);
+            break;
+            
+          case 'EVENTS':
+            scheduleItem.eventTitle = getValue(row, indices.eventTitle);
+            scheduleItem.eventLocation = getValue(row, indices.eventLocation);
+            scheduleItem.eventAgenda = getValue(row, indices.eventAgenda);
+            scheduleItem.speakerInfo = getValue(row, indices.speakerInfo);
+            break;
+            
+          case 'ANNOUNCEMENTS':
+            scheduleItem.messageDetails = getValue(row, indices.messageDetails);
+            scheduleItem.callToAction = getValue(row, indices.callToAction);
+            break;
+            
+          case 'FORMS':
+            scheduleItem.formDescription = getValue(row, indices.formDescription);
+            scheduleItem.formLink = getValue(row, indices.formLink);
+            break;
+            
+          case 'COURSE MATERIAL':
+            scheduleItem.learningObjectives = getValue(row, indices.learningObjectives);
+            scheduleItem.prerequisites = getValue(row, indices.prerequisites);
+            break;
+        }
+        
+        scheduleItems.push(scheduleItem);
+        Logger.log(`Row ${i}: Added schedule item - ${scheduleItem.title}`);
+      } else {
+        Logger.log(`Row ${i}: Failed targeting check`);
+      }
+    }
+    
+    // Sort schedule items by start date/time (upcoming first)
+    scheduleItems.sort((a, b) => {
+      if (!a.startDateTimeRaw) return 1;
+      if (!b.startDateTimeRaw) return -1;
+      return a.startDateTimeRaw - b.startDateTimeRaw;
+    });
+    
+    Logger.log(`Found ${scheduleItems.length} schedule items for ${studentEmail}`);
+    
+    return {
+      success: true,
+      data: scheduleItems
+    };
+    
+  } catch (error) {
+    Logger.log('Error in getStudentSchedule: ' + error.message);
+    return {
+      success: false,
+      error: 'Failed to get student schedule: ' + error.message
+    };
+  }
+}
+
+/**
+ * Get policies and documents for student
+ * @param {string} studentEmail Student email
+ * @return {Object} Policies and documents data
+ */
+function getPoliciesAndDocuments(studentEmail) {
+  try {
+    Logger.log(`Getting policies and documents for: ${studentEmail}`);
+    
+    // Get student profile for batch info
+    const studentProfile = getStudentProfile(studentEmail);
+    if (!studentProfile.success) {
+      Logger.log(`Student profile not found for: ${studentEmail}`);
+      return {
+        success: false,
+        error: 'Student profile not found'
+      };
+    }
+    
+    const student = studentProfile.data;
+    Logger.log(`Student found - Batch: ${student.batch}, Name: ${student.fullName}`);
+    
+    // Get data from main sheet
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(MAIN_SHEET);
+    const data = sheet.getDataRange().getValues();
+    
+    if (data.length <= 2) {
+      Logger.log('Not enough data in sheet - need at least headers and one data row');
+      return {
+        success: true,
+        data: []
+      };
+    }
+    
+    // Headers are in row 2 (index 1), data starts from row 3 (index 2)
+    const headers = data[1];
+    const indices = getColumnIndices(headers);
+    
+    Logger.log(`Headers found: ${headers.length} columns`);
+    Logger.log(`Column indices mapped: ${Object.keys(indices).length} fields`);
+    
+    const policyItems = [];
+    const now = new Date();
+    
+    Logger.log(`Processing ${data.length - 2} data rows for POLICY & DOCUMENTS entries`);
+    
+    // Process each row looking for POLICY & DOCUMENTS entries (start from row 3 = index 2)
+    for (let i = 2; i < data.length; i++) {
+      const row = data[i];
+      
+      // Get category and check if it's POLICY & DOCUMENTS
+      const category = getValue(row, indices.category);
+      Logger.log(`Row ${i}: Category = "${category}"`);
+      
+      // Only process POLICY & DOCUMENTS entries
+      if (category !== 'POLICY & DOCUMENTS') continue;
+      
+      Logger.log(`Found policy/document entry at row ${i}`);
+      
+      // Check if published
+      const publish = getValue(row, indices.publish);
+      Logger.log(`Row ${i}: Publish = "${publish}"`);
+      if (publish !== 'Yes') continue;
+      
+      Logger.log(`Row ${i}: Passed publish check`);
+      
+      // Check if student has access to this policy/document
+      const targetBatch = getValue(row, indices.targetBatch);
+      const targetStudents = getValue(row, indices.targetStudents);
+      
+      Logger.log(`Row ${i}: Target Batch = "${targetBatch}", Student Batch = "${student.batch}"`);
+      
+      if (isContentTargetedToStudent(targetBatch, targetStudents, student)) {
+        Logger.log(`Row ${i}: Passed targeting check`);
+        
+        // Get dates for status calculation
+        const startDateTime = parseDateTime(getValue(row, indices.startDateTime));
+        const endDateTime = parseDateTime(getValue(row, indices.endDateTime));
+        
+        // Calculate status based on dates (if provided)
+        let currentStatus = 'Active';
+        if (startDateTime && endDateTime) {
+          if (now < startDateTime) {
+            currentStatus = 'Upcoming';
+          } else if (now > endDateTime) {
+            currentStatus = 'Expired';
+          } else {
+            currentStatus = 'Active';
+          }
+        } else if (startDateTime && now < startDateTime) {
+          currentStatus = 'Upcoming';
+        } else if (endDateTime && now > endDateTime) {
+          currentStatus = 'Expired';
+        }
+        
+        // Get title
+        let itemTitle = getValue(row, indices.title);
+        if (!itemTitle) {
+          // Try policy name as fallback
+          itemTitle = getValue(row, indices.policyName);
+        }
+        // Final fallback
+        if (!itemTitle) itemTitle = 'Untitled Policy/Document';
+
+        // Create policy/document item
+        const policyItem = {
+          id: getValue(row, indices.id),
+          category: category,
+          eventType: getValue(row, indices.eventType) || 'Policy',
+          title: itemTitle,
+          subTitle: getValue(row, indices.subTitle),
+          content: getValue(row, indices.content),
+          postedBy: getValue(row, indices.postedBy),
+          startDateTime: startDateTime ? startDateTime.toISOString() : null,
+          endDateTime: endDateTime ? endDateTime.toISOString() : null,
+          targetBatch: getValue(row, indices.targetBatch),
+          priority: getValue(row, indices.priority) || 'Medium',
+          status: currentStatus,
+          driveLink: getValue(row, indices.driveLink),
+          sheetsLink: getValue(row, indices.sheetsLink),
+          fileuploadLink: getValue(row, indices.fileuploadLink),
+          requiresAcknowledgment: getValue(row, indices.requiresAcknowledgment) === 'Yes',
+          createdAt: formatDisplayDateTime(getValue(row, indices.createdAt)),
+          editedAt: formatDisplayDateTime(getValue(row, indices.editedAt)),
+          editedBy: getValue(row, indices.editedBy),
+          
+          // POLICY & DOCUMENTS specific fields
+          policyType: getValue(row, indices.policyType),
+          policyName: getValue(row, indices.policyName),
+          policyContent: getValue(row, indices.policyContent)
+        };
+        
+        // Check for files
+        const driveLink = getValue(row, indices.driveLink);
+        const sheetsLink = getValue(row, indices.sheetsLink);
+        const fileuploadLink = getValue(row, indices.fileuploadLink);
+        policyItem.hasFiles = !!(driveLink || sheetsLink || fileuploadLink);
+        
+        policyItems.push(policyItem);
+        Logger.log(`Row ${i}: Added policy/document item - ${policyItem.title}`);
+      } else {
+        Logger.log(`Row ${i}: Failed targeting check`);
+      }
+    }
+    
+    // Sort policy items by title
+    policyItems.sort((a, b) => {
+      const titleA = (a.title || '').toLowerCase();
+      const titleB = (b.title || '').toLowerCase();
+      return titleA.localeCompare(titleB);
+    });
+    
+    Logger.log(`Found ${policyItems.length} policy/document items for ${studentEmail}`);
+    
+    return {
+      success: true,
+      data: policyItems
+    };
+    
+  } catch (error) {
+    Logger.log('Error in getPoliciesAndDocuments: ' + error.message);
+    return {
+      success: false,
+      error: 'Failed to get policies and documents: ' + error.message
     };
   }
 }
@@ -1344,15 +1951,67 @@ function parseDateTime(dateTimeValue) {
   if (!dateTimeValue) return null;
   
   try {
-    if (typeof dateTimeValue === "string") {
-      return new Date(dateTimeValue);
-    } else if (dateTimeValue instanceof Date) {
+    // If it's already a Date object, return it
+    if (dateTimeValue instanceof Date) {
       return dateTimeValue;
-    } else {
-      return new Date(dateTimeValue);
     }
+    
+    // Convert to string for parsing
+    const dateTimeString = String(dateTimeValue).trim();
+    if (!dateTimeString) return null;
+    
+    // Check if it's in dd/mm/yyyy hh:mm:ss format (with flexible whitespace)
+    const ddmmyyyyRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/;
+    const match = dateTimeString.match(ddmmyyyyRegex);
+    
+    // Also try dd/mm/yyyy hh:mm format (without seconds)
+    if (!match) {
+      const ddmmyyyyNoSecRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})$/;
+      const matchNoSec = dateTimeString.match(ddmmyyyyNoSecRegex);
+      
+      if (matchNoSec) {
+        const [, day, month, year, hour, minute] = matchNoSec;
+        const parsedDate = new Date(
+          parseInt(year, 10),
+          parseInt(month, 10) - 1, // Month is 0-indexed
+          parseInt(day, 10),
+          parseInt(hour, 10),
+          parseInt(minute, 10),
+          0 // seconds = 0
+        );
+        
+        Logger.log(`Parsed datetime (no seconds): ${dateTimeString} -> ${parsedDate.toISOString()}`);
+        return parsedDate;
+      }
+    }
+    
+    if (match) {
+      const [, day, month, year, hour, minute, second] = match;
+      // Create Date object (month is 0-indexed in JavaScript)
+      const parsedDate = new Date(
+        parseInt(year, 10),
+        parseInt(month, 10) - 1, // Month is 0-indexed
+        parseInt(day, 10),
+        parseInt(hour, 10),
+        parseInt(minute, 10),
+        parseInt(second, 10)
+      );
+      
+      Logger.log(`Parsed datetime: ${dateTimeString} -> ${parsedDate.toISOString()}`);
+      return parsedDate;
+    }
+    
+    // If not in dd/mm/yyyy format, try standard Date parsing
+    const standardDate = new Date(dateTimeString);
+    if (!isNaN(standardDate.getTime())) {
+      return standardDate;
+    }
+    
+    Logger.log(`Could not parse datetime: ${dateTimeString}`);
+    return null;
+    
   } catch (error) {
-    Logger.log("Error parsing datetime: " + error.message);
+    Logger.log("Error parsing datetime: " + error.message + " for value: " + dateTimeValue);
     return null;
   }
 }
@@ -1374,28 +2033,31 @@ function calculateContentStatus(startDateTime, endDateTime) {
 }
 
 /**
- * Get column indices mapping
+ * Get column indices mapping for new ALLINONE structure
  * @param {Array} headers Array of header names
  * @return {Object} Column indices mapping
  */
 function getColumnIndices(headers) {
   const indices = {};
   const mapping = {
-    // STATIC CORE
+    // STATIC CORE (Common for all categories)
     "S.ID": "id",
     "S.Category": "category", 
     "S.Event Type": "eventType",
+    "S.Publish": "publish",
     "S.Title": "title",
     "S.SubTitle": "subTitle",
     "S.Content": "content",
     "S.Posted By": "postedBy",
     "S.Created at": "createdAt",
     "S.Edited at": "editedAt",
+    "S.Edited by": "editedBy",
     "S.StartDateTime": "startDateTime",
     "S.EndDateTime": "endDateTime", 
     "S.Status": "status",
     "S.Target Batch": "targetBatch",
     "S.TERM": "term",
+    "S.Domain": "domain",
     "S.Subject": "subject",
     "S.Groups": "groups",
     "S.Students": "targetStudents",
@@ -1406,15 +2068,16 @@ function getColumnIndices(headers) {
     "S.SheetsLink": "sheetsLink",
     "S.Acknowledge": "requireAcknowledgment",
     
+    // CATEGORY-SPECIFIC COLUMNS
+    
     // DASHBOARDS
     "D.Dashboard Name": "dashboardName",
     "D.Dashboard Link": "dashboardLink",
     "D.Description": "dashboardDescription",
+    "D.Sop": "dashboardSop",
+    "D.Visibility": "dashboardVisibility",
     
     // COURSE MATERIAL
-    "C.Course": "course",
-    "C.Domain": "domain",
-    "C.MaterialType": "materialType",
     "C.Learning Objectives": "learningObjectives",
     "C.Prerequisites": "prerequisites",
     
@@ -1424,7 +2087,6 @@ function getColumnIndices(headers) {
     "AT.Submission Guidelines": "submissionGuidelines",
     "AT.Rubric Link": "rubricLink",
     "AT.Group Size": "groupSize",
-    "AT.Due Date": "dueDate",
     
     // ANNOUNCEMENTS
     "AN.Message Details": "messageDetails",
@@ -1432,13 +2094,14 @@ function getColumnIndices(headers) {
     "AN.Read Tracking": "readTracking",
     
     // POLICY & DOCUMENTS
+    "PD.Type": "policyType",
     "PD.Policy Name": "policyName",
-    "PD.Policy Parent": "policyParent",
+    "PD.Content": "policyContent",
     
     // EVENTS
-    "E.Event Date": "eventDate",
-    "E.Location / Link": "eventLocation",
-    "E.Agenda": "agenda",
+    "E.Title": "eventTitle",
+    "E.Location/Link": "eventLocation",
+    "E.Agenda": "eventAgenda",
     "E.Speaker Info (if any)": "speakerInfo",
     
     // FORMS
@@ -2159,7 +2822,7 @@ function getAvailableFilters() {
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(MAIN_SHEET);
     const data = sheet.getDataRange().getValues();
     
-    if (data.length <= 1) {
+    if (data.length <= 2) {
       return {
         success: true,
         data: {
@@ -2171,14 +2834,15 @@ function getAvailableFilters() {
       };
     }
 
-    const headers = data[0];
+    // Headers are in row 2 (index 1), data starts from row 3 (index 2)
+    const headers = data[1];
     const indices = getColumnIndices(headers);
     
     const categories = new Set();
     const eventTypes = new Set();
 
-    // Collect unique values from all content
-    for (let i = 1; i < data.length; i++) {
+    // Collect unique values from all content (start from row 3 = index 2)
+    for (let i = 2; i < data.length; i++) {
       const row = data[i];
       const category = getValue(row, indices.category);
       const eventType = getValue(row, indices.eventType);

@@ -6,6 +6,7 @@ import {
   Megaphone, 
   FolderOpen, 
   Calendar, 
+  FileText,
   User,
   Menu
 } from 'lucide-react';
@@ -21,9 +22,10 @@ const navigation = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Dashboard', href: '/dashboards', icon: LayoutDashboard },
   { name: 'Assignments', href: '/assignments', icon: ClipboardList },
-  { name: 'Announcements', href: '/announcements', icon: Megaphone },
+  { name: 'Events & Announcements', href: '/announcements', icon: Megaphone },
   { name: 'Resources', href: '/resources', icon: FolderOpen },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
+  { name: 'Policy & Documents', href: '/policies', icon: FileText },
   { name: 'Profile', href: '/profile', icon: User },
 ];
 
