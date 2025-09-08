@@ -299,7 +299,36 @@ const Profile: React.FC = () => {
                 <AvatarImage 
                   src={profile.profilePicture}
                   onLoad={() => console.log('Profile image loaded successfully:', profile.profilePicture)}
-                  onError={() => console.log('Profile image failed to load:', profile.profilePicture)}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    const currentSrc = target.src;
+                    console.log('Profile image failed to load:', currentSrc);
+                    console.log('Original URL from backend:', profile.profilePicture);
+                    
+                    // Check if we've already retried to prevent infinite loops
+                    if (target.dataset.retried === 'true') {
+                      console.log('Already retried, showing fallback avatar');
+                      target.removeAttribute('src');
+                      return;
+                    }
+                    
+                    // Only attempt Google Drive conversion if URL contains 'drive.google.com'
+                    if (currentSrc && currentSrc.includes('drive.google.com') && currentSrc.includes('=w400-h400')) {
+                      // Extract file ID from Google Drive URL
+                      const fileIdMatch = currentSrc.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                      if (fileIdMatch?.[1]) {
+                        const newUrl = `https://drive.google.com/uc?export=view&id=${fileIdMatch[1]}`;
+                        console.log('Converting Google Drive URL to direct format:', newUrl);
+                        target.dataset.retried = 'true';
+                        target.src = newUrl;
+                        return;
+                      }
+                    }
+                    
+                    // For all other URLs (ImgBB, direct public links, etc.) or failed conversions
+                    console.log('Unable to load image, showing fallback avatar');
+                    target.removeAttribute('src');
+                  }}
                 />
                 <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-2xl font-semibold">
                   {getInitials(profile.fullName)}

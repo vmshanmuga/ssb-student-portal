@@ -56,7 +56,11 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, setSidebarOpen }) => {
         // Get full profile for profile picture
         const fullResult = await apiService.getFullStudentProfile(user.email);
         if (fullResult.success && fullResult.data) {
+          console.log('Header: Full profile data received:', fullResult.data);
+          console.log('Header: Profile picture URL:', fullResult.data.profilePicture);
           setFullProfile(fullResult.data);
+        } else {
+          console.error('Header: Failed to get full profile:', fullResult.error);
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
@@ -135,23 +139,34 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, setSidebarOpen }) => {
                         src={fullProfile?.profilePicture} 
                         alt={userProfile?.fullName || 'User'}
                         onError={(e) => {
-                          console.log('Header profile image failed to load:', fullProfile?.profilePicture);
                           const target = e.target as HTMLImageElement;
                           const currentSrc = target.src;
+                          console.log('Header profile image failed to load:', currentSrc);
+                          console.log('Header original URL from backend:', fullProfile?.profilePicture);
                           
-                          // Try Google Drive direct access format
-                          if (currentSrc && currentSrc.includes('=w400-h400')) {
+                          // Check if we've already retried to prevent infinite loops
+                          if (target.dataset.retried === 'true') {
+                            console.log('Header: Already retried, showing fallback avatar');
+                            target.removeAttribute('src');
+                            return;
+                          }
+                          
+                          // Only attempt Google Drive conversion if URL contains 'drive.google.com'
+                          if (currentSrc && currentSrc.includes('drive.google.com') && currentSrc.includes('=w400-h400')) {
                             // Extract file ID from Google Drive URL
-                            const fileId = currentSrc.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1];
-                            if (fileId) {
-                              console.log('Header: Trying Google Drive direct format for fileId:', fileId);
-                              target.src = `https://drive.google.com/uc?export=view&id=${fileId}`;
+                            const fileIdMatch = currentSrc.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                            if (fileIdMatch?.[1]) {
+                              const newUrl = `https://drive.google.com/uc?export=view&id=${fileIdMatch[1]}`;
+                              console.log('Header: Converting Google Drive URL to direct format:', newUrl);
+                              target.dataset.retried = 'true';
+                              target.src = newUrl;
                               return;
                             }
                           }
                           
-                          // If all fails, remove src to show fallback
-                          target.src = '';
+                          // For all other URLs (ImgBB, direct public links, etc.) or failed conversions
+                          console.log('Header: Unable to load image, showing fallback avatar');
+                          target.removeAttribute('src');
                         }}
                       />
                       <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-medium">
