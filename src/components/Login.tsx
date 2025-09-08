@@ -125,13 +125,22 @@ const Login: React.FC = () => {
         <div className="orbit orbit-8"></div>
         <div className="orbit orbit-9"></div>
         
-        {/* Planets Only */}
+        {/* Planets with Moons and Features */}
         <div className="planet planet-1"></div>
         <div className="planet planet-2"></div>
         <div className="planet planet-3"></div>
         <div className="planet planet-4"></div>
-        <div className="planet planet-5"></div>
-        <div className="planet planet-6"></div>
+        <div className="planet planet-5">
+          {/* Jupiter's Moons */}
+          <div className="jupiter-moon-1"></div>
+          <div className="jupiter-moon-2"></div>
+          <div className="jupiter-moon-3"></div>
+          <div className="jupiter-moon-4"></div>
+        </div>
+        <div className="planet planet-6">
+          {/* Saturn's additional outer ring */}
+          <div className="saturn-outer-ring"></div>
+        </div>
         <div className="planet planet-7"></div>
         <div className="planet planet-8"></div>
         <div className="planet planet-9"></div>

@@ -135,18 +135,23 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, setSidebarOpen }) => {
                         src={fullProfile?.profilePicture} 
                         alt={userProfile?.fullName || 'User'}
                         onError={(e) => {
-                          // Try alternative Google Drive formats if the primary one fails
+                          console.log('Header profile image failed to load:', fullProfile?.profilePicture);
                           const target = e.target as HTMLImageElement;
                           const currentSrc = target.src;
                           
-                          if (currentSrc.includes('lh3.googleusercontent.com') && currentSrc.includes('=w400-h400')) {
-                            target.src = currentSrc.replace('=w400-h400', '');
-                          } else if (currentSrc.includes('lh3.googleusercontent.com') && !currentSrc.includes('drive.google.com')) {
+                          // Try Google Drive direct access format
+                          if (currentSrc && currentSrc.includes('=w400-h400')) {
+                            // Extract file ID from Google Drive URL
                             const fileId = currentSrc.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1];
                             if (fileId) {
+                              console.log('Header: Trying Google Drive direct format for fileId:', fileId);
                               target.src = `https://drive.google.com/uc?export=view&id=${fileId}`;
+                              return;
                             }
                           }
+                          
+                          // If all fails, remove src to show fallback
+                          target.src = '';
                         }}
                       />
                       <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-medium">

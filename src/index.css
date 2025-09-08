@@ -154,65 +154,171 @@
     transform-origin: 0 0;
   }
   
-  /* Planet 1 - Mercury */
+  /* Planet 1 - Mercury (Gray/Brown - Rocky surface) */
   .planet-1 {
     width: 8px;
     height: 8px;
-    background: radial-gradient(circle, #8c7853, #6b5b47);
+    background: radial-gradient(circle at 30% 30%, #8C7853, #5D4E37, #4A3C2A);
     animation: orbit1 6s linear infinite;
-    transform: translate(-50%, -50%) translateX(60px);
-    box-shadow: 0 0 10px rgba(140, 120, 83, 0.8);
+    transform: translate(-50%, -50%);
+    transform-origin: 0 0;
+    box-shadow: 0 0 8px rgba(140, 120, 83, 0.6);
   }
   
-  /* Planet 2 - Venus */
+  /* Planet 2 - Venus (Bright Yellow/White - Thick atmosphere) */
   .planet-2 {
     width: 12px;
     height: 12px;
-    background: radial-gradient(circle, #ff7733, #cc5500);
+    background: radial-gradient(circle at 30% 30%, #FFC649, #FFE135, #FFC107);
     animation: orbit2 10s linear infinite;
-    transform: translate(-50%, -50%) translateX(90px);
-    box-shadow: 0 0 15px rgba(255, 119, 51, 0.8);
+    transform: translate(-50%, -50%);
+    transform-origin: 0 0;
+    box-shadow: 0 0 15px rgba(255, 198, 73, 0.9);
   }
   
-  /* Planet 3 - Earth */
+  /* Planet 3 - Earth (Blue/Green - Oceans and continents) */
   .planet-3 {
     width: 14px;
     height: 14px;
-    background: radial-gradient(circle, #22c55e, #1d8f5b);
+    background: radial-gradient(circle at 30% 30%, #6CB4EE, #4682B4, #228B22, #006400);
     animation: orbit3 15s linear infinite;
-    transform: translate(-50%, -50%) translateX(120px);
-    box-shadow: 0 0 20px rgba(29, 143, 91, 0.9);
+    transform: translate(-50%, -50%);
+    transform-origin: 0 0;
+    box-shadow: 0 0 20px rgba(100, 149, 237, 0.8);
+    position: relative;
   }
   
-  /* Planet 4 - Mars */
+  /* Earth's Moon */
+  .planet-3::after {
+    content: '';
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    background: radial-gradient(circle, #C0C0C0, #808080);
+    border-radius: 50%;
+    top: -8px;
+    right: -8px;
+    animation: moonOrbit 2s linear infinite;
+    box-shadow: 0 0 4px rgba(192, 192, 192, 0.6);
+  }
+  
+  /* Planet 4 - Mars (Red/Rusty - Iron oxide surface) */
   .planet-4 {
     width: 10px;
     height: 10px;
-    background: radial-gradient(circle, #ef4444, #dc2626);
+    background: radial-gradient(circle at 30% 30%, #CD5C5C, #A0522D, #8B4513);
     animation: orbit4 22s linear infinite;
-    transform: translate(-50%, -50%) translateX(160px);
-    box-shadow: 0 0 15px rgba(239, 68, 68, 0.8);
+    transform: translate(-50%, -50%);
+    transform-origin: 0 0;
+    box-shadow: 0 0 15px rgba(205, 92, 92, 0.7);
   }
   
-  /* Planet 5 - Jupiter */
+  /* Planet 5 - Jupiter (Orange/Brown bands - Gas giant) */
   .planet-5 {
     width: 28px;
     height: 28px;
-    background: radial-gradient(circle, #f59e0b, #d97706);
+    background: 
+      radial-gradient(ellipse at 30% 30%, #D2691E, #FF7F50, #CD853F, #A0522D),
+      linear-gradient(0deg, #8B4513 0%, #D2691E 25%, #FF7F50 50%, #D2691E 75%, #8B4513 100%);
+    background-blend-mode: multiply;
     animation: orbit5 35s linear infinite;
-    transform: translate(-50%, -50%) translateX(210px);
-    box-shadow: 0 0 35px rgba(245, 158, 11, 0.7);
+    transform: translate(-50%, -50%);
+    transform-origin: 0 0;
+    box-shadow: 0 0 35px rgba(210, 105, 30, 0.8);
+    position: relative;
   }
   
-  /* Planet 6 - Saturn */
+  /* Jupiter's Great Red Spot */
+  .planet-5::before {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 6px;
+    background: radial-gradient(ellipse, #DC143C, #8B0000);
+    border-radius: 50%;
+    top: 45%;
+    left: 60%;
+    transform: translate(-50%, -50%);
+    opacity: 0.8;
+  }
+  
+  /* Jupiter's Moons (Io, Europa, Ganymede, Callisto) */
+  .jupiter-moon-1 {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background: radial-gradient(circle, #FFFF99, #FFD700);
+    border-radius: 50%;
+    top: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    animation: jupiterMoon1 3s linear infinite;
+    box-shadow: 0 0 3px rgba(255, 215, 0, 0.6);
+  }
+  
+  .jupiter-moon-2 {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background: radial-gradient(circle, #E6E6FA, #C0C0C0);
+    border-radius: 50%;
+    top: 50%;
+    right: -18px;
+    transform: translateY(-50%);
+    animation: jupiterMoon2 4s linear infinite;
+    box-shadow: 0 0 3px rgba(192, 192, 192, 0.6);
+  }
+  
+  .jupiter-moon-3 {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background: radial-gradient(circle, #708090, #2F4F4F);
+    border-radius: 50%;
+    bottom: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    animation: jupiterMoon3 5s linear infinite;
+    box-shadow: 0 0 3px rgba(112, 128, 144, 0.6);
+  }
+  
+  .jupiter-moon-4 {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background: radial-gradient(circle, #696969, #2F2F2F);
+    border-radius: 50%;
+    top: 50%;
+    left: -18px;
+    transform: translateY(-50%);
+    animation: jupiterMoon4 6s linear infinite;
+    box-shadow: 0 0 3px rgba(105, 105, 105, 0.6);
+  }
+  
+  /* Planet 6 - Saturn (Pale Gold - Gas giant with rings) */
   .planet-6 {
     width: 24px;
     height: 24px;
-    background: radial-gradient(circle, #eab308, #ca8a04);
+    background: radial-gradient(circle at 30% 30%, #FAD5A5, #DEB887, #D2B48C);
     animation: orbit6 50s linear infinite;
-    transform: translate(-50%, -50%) translateX(270px);
-    box-shadow: 0 0 30px rgba(234, 179, 8, 0.7);
+    transform: translate(-50%, -50%);
+    transform-origin: 0 0;
+    box-shadow: 0 0 30px rgba(250, 213, 165, 0.7);
     position: relative;
+  }
+  
+  /* Saturn's Rings - Multiple layers for realism */
+  .planet-6::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 45px;
+    height: 45px;
+    border: 2px solid rgba(210, 180, 140, 0.6);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    z-index: -1;
   }
   
   .planet-6::after {
@@ -220,41 +326,58 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 40px;
-    height: 40px;
-    border: 2px solid rgba(234, 179, 8, 0.4);
+    width: 38px;
+    height: 38px;
+    border: 1.5px solid rgba(250, 213, 165, 0.4);
     border-radius: 50%;
     transform: translate(-50%, -50%);
+    z-index: -1;
   }
   
-  /* Planet 7 - Uranus */
+  /* Additional ring using box-shadow */
+  .saturn-outer-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 52px;
+    height: 52px;
+    border: 1px solid rgba(192, 192, 192, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    z-index: -1;
+  }
+  
+  /* Planet 7 - Uranus (Ice Blue/Cyan - Methane atmosphere) */
   .planet-7 {
     width: 18px;
     height: 18px;
-    background: radial-gradient(circle, #06b6d4, #0891b2);
+    background: radial-gradient(circle at 30% 30%, #4FD0E7, #48CAE4, #0096C7, #023E8A);
     animation: orbit7 70s linear infinite;
-    transform: translate(-50%, -50%) translateX(340px);
-    box-shadow: 0 0 25px rgba(6, 182, 212, 0.8);
+    transform: translate(-50%, -50%);
+    transform-origin: 0 0;
+    box-shadow: 0 0 25px rgba(79, 208, 231, 0.8);
   }
   
-  /* Planet 8 - Neptune */
+  /* Planet 8 - Neptune (Deep Blue - Windy atmosphere) */
   .planet-8 {
     width: 16px;
     height: 16px;
-    background: radial-gradient(circle, #3b82f6, #2563eb);
+    background: radial-gradient(circle at 30% 30%, #1E3A8A, #1E40AF, #1E3A8A, #0F172A);
     animation: orbit8 90s linear infinite;
-    transform: translate(-50%, -50%) translateX(420px);
-    box-shadow: 0 0 25px rgba(59, 130, 246, 0.8);
+    transform: translate(-50%, -50%);
+    transform-origin: 0 0;
+    box-shadow: 0 0 25px rgba(30, 58, 138, 0.9);
   }
   
-  /* Planet 9 - Pluto */
+  /* Planet 9 - Pluto (Brown/Gray - Dwarf planet) */
   .planet-9 {
     width: 6px;
     height: 6px;
-    background: radial-gradient(circle, #8b5cf6, #7c3aed);
+    background: radial-gradient(circle at 30% 30%, #8B4513, #A0522D, #654321);
     animation: orbit9 120s linear infinite;
-    transform: translate(-50%, -50%) translateX(510px);
-    box-shadow: 0 0 15px rgba(139, 92, 246, 0.8);
+    transform: translate(-50%, -50%);
+    transform-origin: 0 0;
+    box-shadow: 0 0 12px rgba(139, 69, 19, 0.6);
   }
   
   /* Static Glass Card - Clean */
@@ -756,5 +879,31 @@
     0% { transform: translateX(-100%); opacity: 0; }
     50% { opacity: 1; }
     100% { transform: translateX(100%); opacity: 0; }
+  }
+  
+  /* Moon and Jupiter Moons Animations */
+  @keyframes moonOrbit {
+    0% { transform: translateX(-50%) translateY(-50%) rotate(0deg) translateX(10px) rotate(0deg); }
+    100% { transform: translateX(-50%) translateY(-50%) rotate(360deg) translateX(10px) rotate(-360deg); }
+  }
+  
+  @keyframes jupiterMoon1 {
+    0% { transform: translateX(-50%) rotate(0deg) translateY(-15px) rotate(0deg); }
+    100% { transform: translateX(-50%) rotate(360deg) translateY(-15px) rotate(-360deg); }
+  }
+  
+  @keyframes jupiterMoon2 {
+    0% { transform: translateY(-50%) rotate(0deg) translateX(18px) rotate(0deg); }
+    100% { transform: translateY(-50%) rotate(360deg) translateX(18px) rotate(-360deg); }
+  }
+  
+  @keyframes jupiterMoon3 {
+    0% { transform: translateX(-50%) rotate(0deg) translateY(15px) rotate(0deg); }
+    100% { transform: translateX(-50%) rotate(360deg) translateY(15px) rotate(-360deg); }
+  }
+  
+  @keyframes jupiterMoon4 {
+    0% { transform: translateY(-50%) rotate(0deg) translateX(-18px) rotate(0deg); }
+    100% { transform: translateY(-50%) rotate(360deg) translateX(-18px) rotate(-360deg); }
   }
 }

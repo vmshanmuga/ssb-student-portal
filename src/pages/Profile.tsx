@@ -60,6 +60,8 @@ const Profile: React.FC = () => {
       const result = await apiService.getFullStudentProfile(user.email);
       
       if (result.success && result.data) {
+        console.log('Full profile data received:', result.data);
+        console.log('Profile picture URL:', result.data.profilePicture);
         setProfile(result.data);
         setEditForm(result.data);
       } else {
@@ -295,23 +297,9 @@ const Profile: React.FC = () => {
             <div className="flex flex-col items-center space-y-4">
               <Avatar className="h-32 w-32 border-4 border-background shadow-lg">
                 <AvatarImage 
-                  src={profile.profilePicture} 
-                  onError={(e) => {
-                    // Try alternative Google Drive formats if the primary one fails
-                    const target = e.target as HTMLImageElement;
-                    const currentSrc = target.src;
-                    
-                    if (currentSrc.includes('lh3.googleusercontent.com') && currentSrc.includes('=w400-h400')) {
-                      // Try without size parameter
-                      target.src = currentSrc.replace('=w400-h400', '');
-                    } else if (currentSrc.includes('lh3.googleusercontent.com') && !currentSrc.includes('drive.google.com')) {
-                      // Try drive.google.com format
-                      const fileId = currentSrc.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1];
-                      if (fileId) {
-                        target.src = `https://drive.google.com/uc?export=view&id=${fileId}`;
-                      }
-                    }
-                  }}
+                  src={profile.profilePicture}
+                  onLoad={() => console.log('Profile image loaded successfully:', profile.profilePicture)}
+                  onError={() => console.log('Profile image failed to load:', profile.profilePicture)}
                 />
                 <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-2xl font-semibold">
                   {getInitials(profile.fullName)}
