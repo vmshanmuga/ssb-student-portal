@@ -8,20 +8,237 @@ import {
   Search,
   Download,
   Calendar,
-  User,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  X,
+  ExternalLink,
+  File
 } from 'lucide-react';
 import { apiService, type ContentItem } from '../services/api';
 import { auth } from '../firebase/config';
 import toast from 'react-hot-toast';
 
+// Modal component for policy details
+const PolicyModal = ({ policy, isOpen, onClose }: { 
+  policy: ContentItem | null; 
+  isOpen: boolean; 
+  onClose: () => void; 
+}) => {
+  const [loading, setLoading] = useState(false);
+
+  // Handle escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen, onClose]);
+
+  const formatPublishedDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const seconds = date.getSeconds().toString().padStart(2, '0');
+      
+      return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+    } catch {
+      return dateString;
+    }
+  };
+
+  const getPolicyTypeBadgeColor = (type: string) => {
+    switch (type?.toLowerCase()) {
+      case 'policy':
+        return 'bg-[#1d8f5b] text-white border-[#1d8f5b]';
+      case 'document':
+        return 'bg-[#ffc300] text-[#3a3a3a] border-[#ffc300]';
+      default:
+        return 'bg-[#3a3a3a] text-white border-[#3a3a3a]';
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'High': return 'bg-red-100 text-red-800 border-red-200';
+      case 'Medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'Low': return 'bg-green-100 text-green-800 border-green-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const handleDownload = async (url: string, filename: string = 'file') => {
+    setLoading(true);
+    try {
+      window.open(url, '_blank');
+      toast.success('Opening file...');
+    } catch (error) {
+      toast.error('Failed to open file');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen || !policy) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      
+      {/* Modal */}
+      <div className="relative bg-background rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+        {/* Header */}
+        <div className="flex items-start justify-between p-6 border-b">
+          <div className="flex-1 pr-4">
+            <h2 className="text-2xl font-bold text-[#3a3a3a] mb-3">
+              {policy.policyName || policy.title}
+            </h2>
+            
+            <div className="flex flex-wrap gap-2">
+              <Badge className={getPolicyTypeBadgeColor(policy.policyType || 'policy')}>
+                {policy.policyType || 'Policy'}
+              </Badge>
+              
+              {policy.priority && (
+                <Badge variant="outline" className={getPriorityColor(policy.priority)}>
+                  {policy.priority} Priority
+                </Badge>
+              )}
+            </div>
+          </div>
+          
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-muted rounded-full transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="overflow-y-auto max-h-[calc(90vh-200px)]">
+          <div className="p-6 space-y-6">
+            {/* Metadata */}
+            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+              <Calendar className="h-4 w-4" />
+              <span>Published: {formatPublishedDate(policy.startDateTime)}</span>
+            </div>
+
+            {/* HTML Content */}
+            {policy.policyContent && (
+              <div className="border rounded-lg p-6 bg-muted/20">
+                <div 
+                  className="prose prose-sm max-w-none
+                    prose-headings:text-[#3a3a3a]
+                    prose-p:text-[#3a3a3a]
+                    prose-strong:text-[#3a3a3a]
+                    prose-ul:text-[#3a3a3a]
+                    prose-ol:text-[#3a3a3a]
+                    prose-li:text-[#3a3a3a]
+                    prose-a:text-[#1d8f5b]
+                    prose-a:hover:text-[#1d8f5b]/80"
+                  dangerouslySetInnerHTML={{ __html: policy.policyContent }}
+                />
+              </div>
+            )}
+
+            {/* Files Section */}
+            {(policy.driveLink || policy.fileuploadLink) && (
+              <div className="border rounded-lg p-6">
+                <h4 className="font-semibold text-[#3a3a3a] mb-4 flex items-center">
+                  <File className="h-4 w-4 mr-2" />
+                  Available Files
+                </h4>
+                
+                <div className="space-y-3">
+                  {policy.driveLink && (
+                    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <FileText className="h-5 w-5 text-[#1d8f5b]" />
+                        <span className="font-medium">Document (Google Drive)</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handleDownload(policy.driveLink!, 'document')}
+                        disabled={loading}
+                        className="bg-[#1d8f5b] hover:bg-[#1d8f5b]/90 text-white"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Open
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {policy.fileuploadLink && (
+                    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <Download className="h-5 w-5 text-[#1d8f5b]" />
+                        <span className="font-medium">Attachment</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handleDownload(policy.fileuploadLink!, 'attachment')}
+                        disabled={loading}
+                        className="bg-[#1d8f5b] hover:bg-[#1d8f5b]/90 text-white"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Acknowledgment Notice */}
+            {policy.requiresAcknowledgment && (
+              <div className="flex items-center space-x-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-amber-800">Acknowledgment Required</p>
+                  <p className="text-sm text-amber-700">This policy requires your acknowledgment.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end p-6 border-t bg-muted/20">
+          <Button onClick={onClose} variant="outline">
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Policies: React.FC = () => {
   const [policies, setPolicies] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [selectedPolicy, setSelectedPolicy] = useState<ContentItem | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const user = auth.currentUser;
 
   useEffect(() => {
@@ -64,156 +281,114 @@ const Policies: React.FC = () => {
     };
 
     fetchPolicies();
-  }, []);
+  }, [user?.email]);
 
   const filteredPolicies = policies
     .filter(policy => {
-      const matchesSearch = policy.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (policy.subTitle || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (policy.content || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (policy.policyType || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || policy.status === statusFilter;
-      const matchesType = typeFilter === 'all' || (policy.policyType || policy.eventType) === typeFilter;
+      const searchFields = [
+        policy.policyName || policy.title,
+        policy.policyType,
+        policy.policyContent
+      ].filter(Boolean);
       
-      return matchesSearch && matchesStatus && matchesType;
+      const matchesSearch = searchTerm === '' || searchFields.some(field => 
+        field && field.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      
+      const matchesType = typeFilter === 'all' || policy.policyType === typeFilter;
+      
+      return matchesSearch && matchesType;
     })
-    .sort((a, b) => a.title.localeCompare(b.title));
+    .sort((a, b) => {
+      const titleA = a.policyName || a.title;
+      const titleB = b.policyName || b.title;
+      return titleA.localeCompare(titleB);
+    });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Active': return 'bg-green-100 text-green-800 border-green-200';
-      case 'Upcoming': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'Expired': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+  const formatPublishedDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const seconds = date.getSeconds().toString().padStart(2, '0');
+      
+      return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+    } catch {
+      return dateString;
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'High': return 'bg-red-100 text-red-800 border-red-200';
-      case 'Medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'Low': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+  const getPolicyTypeBadgeColor = (type: string) => {
+    switch (type?.toLowerCase()) {
+      case 'policy':
+        return 'bg-[#1d8f5b] text-white border-[#1d8f5b]';
+      case 'document':
+        return 'bg-[#ffc300] text-[#3a3a3a] border-[#ffc300]';
+      default:
+        return 'bg-[#3a3a3a] text-white border-[#3a3a3a]';
     }
   };
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'Academic': return 'bg-[#1d8f5b]/10 text-[#1d8f5b] border-[#1d8f5b]/20';
-      case 'Administrative': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'Code of Conduct': return 'bg-red-100 text-red-800 border-red-200';
-      case 'Guidelines': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'Forms': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
+  const uniqueTypes = Array.from(new Set(policies.map(p => p.policyType).filter(Boolean)));
 
-  const handleDownload = (policy: ContentItem) => {
-    if (policy.driveLink) {
-      window.open(policy.driveLink, '_blank');
-    } else if (policy.sheetsLink) {
-      window.open(policy.sheetsLink, '_blank');
-    } else if (policy.fileuploadLink) {
-      window.open(policy.fileuploadLink, '_blank');
-    } else {
-      toast.error('No download link available');
-    }
+  const handleCardClick = (policy: ContentItem) => {
+    setSelectedPolicy(policy);
+    setModalOpen(true);
   };
-
-  const getTimeAgo = (date: string) => {
-    const now = new Date();
-    const policyDate = new Date(date);
-    const diffTime = now.getTime() - policyDate.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays <= 7) return `${diffDays} days ago`;
-    return policyDate.toLocaleDateString();
-  };
-
-  const uniqueStatuses = Array.from(new Set(policies.map(p => p.status).filter(Boolean)));
-  const uniqueTypes = Array.from(new Set(policies.map(p => p.policyType || p.eventType).filter(Boolean)));
 
   const PolicyCard = ({ policy }: { policy: ContentItem }) => (
-    <Card className="hover:shadow-md transition-all">
+    <Card 
+      className="hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer border-l-4 border-l-[#1d8f5b]"
+      onClick={() => handleCardClick(policy)}
+    >
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <div className="flex items-center space-x-2 mb-2">
-              <FileText className="h-5 w-5 text-[#1d8f5b]" />
-              <CardTitle className="text-lg">{policy.title}</CardTitle>
-            </div>
+            <CardTitle className="text-lg font-bold text-[#3a3a3a] mb-3">
+              {policy.policyName || policy.title}
+            </CardTitle>
             
-            <div className="flex flex-wrap gap-2 mb-3">
-              <Badge variant="outline" className={getStatusColor(policy.status)}>
-                {policy.status}
+            <div className="flex flex-wrap gap-2">
+              <Badge className={getPolicyTypeBadgeColor(policy.policyType || 'policy')}>
+                {policy.policyType || 'Policy'}
               </Badge>
-              <Badge variant="outline" className={getPriorityColor(policy.priority)}>
-                {policy.priority} Priority
-              </Badge>
-              {(policy.policyType || policy.eventType) && (
-                <Badge variant="outline" className={getTypeColor(policy.policyType || policy.eventType)}>
-                  {policy.policyType || policy.eventType}
-                </Badge>
-              )}
             </div>
           </div>
           
-          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+          <div className="flex items-center space-x-2 text-sm text-muted-foreground ml-4">
             <Calendar className="h-4 w-4" />
-            <span>{getTimeAgo(policy.createdAt)}</span>
+            <span className="text-right">
+              {formatPublishedDate(policy.startDateTime)}
+            </span>
           </div>
         </div>
       </CardHeader>
       
       <CardContent>
-        <div className="space-y-4">
-          {policy.subTitle && (
-            <p className="font-medium text-[#1d8f5b]">{policy.subTitle}</p>
-          )}
-          
-          {policy.content && (
-            <p className="text-muted-foreground leading-relaxed">{policy.content}</p>
-          )}
-
+        <div className="space-y-3">
+          {/* Content preview */}
           {policy.policyContent && (
-            <div className="bg-muted/50 p-4 rounded-lg">
-              <h4 className="font-medium mb-2">Policy Details:</h4>
-              <p className="text-sm text-muted-foreground">{policy.policyContent}</p>
-            </div>
-          )}
-
-          {policy.requiresAcknowledgment && (
-            <div className="flex items-center space-x-2 text-amber-600 bg-amber-50 p-3 rounded-lg">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-sm font-medium">Acknowledgment Required</span>
+            <div className="text-sm text-muted-foreground">
+              <div 
+                className="line-clamp-2"
+                dangerouslySetInnerHTML={{ 
+                  __html: policy.policyContent.replace(/<[^>]*>/g, '').substring(0, 150) + '...' 
+                }}
+              />
             </div>
           )}
           
-          <div className="flex items-center justify-between pt-3 border-t">
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-              <User className="h-4 w-4" />
-              <span>{policy.postedBy || 'Admin'}</span>
-              {policy.editedAt && policy.editedBy && (
-                <>
-                  <span>•</span>
-                  <span>Updated by {policy.editedBy}</span>
-                </>
-              )}
-            </div>
-            
+          {/* Footer */}
+          <div className="flex items-center justify-end pt-3 border-t">
             <div className="flex items-center space-x-2">
-              {policy.hasFiles && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleDownload(policy)}
-                  className="text-[#1d8f5b] border-[#1d8f5b] hover:bg-[#1d8f5b] hover:text-white"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
+              {(policy.driveLink || policy.fileuploadLink) && (
+                <div className="flex items-center space-x-1 text-sm text-[#1d8f5b]">
+                  <Download className="h-4 w-4" />
+                  <span>Files available</span>
+                </div>
               )}
             </div>
           </div>
@@ -225,13 +400,15 @@ const Policies: React.FC = () => {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
             <Card key={i}>
-              <CardContent className="p-4">
+              <CardContent className="p-6">
                 <div className="animate-pulse">
-                  <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-                  <div className="h-8 bg-muted rounded w-1/2"></div>
+                  <div className="h-6 bg-muted rounded w-3/4 mb-3"></div>
+                  <div className="h-4 bg-muted rounded w-1/2 mb-4"></div>
+                  <div className="h-4 bg-muted rounded w-full mb-2"></div>
+                  <div className="h-4 bg-muted rounded w-2/3"></div>
                 </div>
               </CardContent>
             </Card>
@@ -263,9 +440,9 @@ const Policies: React.FC = () => {
               <CheckCircle className="h-5 w-5 text-green-600" />
               <div>
                 <p className="text-2xl font-bold text-[#3a3a3a]">
-                  {policies.filter(p => p.status === 'Active').length}
+                  {policies.filter(p => p.policyType?.toLowerCase() === 'policy').length}
                 </p>
-                <p className="text-sm text-muted-foreground">Active</p>
+                <p className="text-sm text-muted-foreground">Policies</p>
               </div>
             </div>
           </CardContent>
@@ -274,12 +451,12 @@ const Policies: React.FC = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <File className="h-5 w-5 text-[#ffc300]" />
               <div>
                 <p className="text-2xl font-bold text-[#3a3a3a]">
-                  {policies.filter(p => p.requiresAcknowledgment).length}
+                  {policies.filter(p => p.policyType?.toLowerCase() === 'document').length}
                 </p>
-                <p className="text-sm text-muted-foreground">Need Action</p>
+                <p className="text-sm text-muted-foreground">Documents</p>
               </div>
             </div>
           </CardContent>
@@ -291,7 +468,7 @@ const Policies: React.FC = () => {
               <Download className="h-5 w-5 text-blue-600" />
               <div>
                 <p className="text-2xl font-bold text-[#3a3a3a]">
-                  {policies.filter(p => p.hasFiles).length}
+                  {policies.filter(p => p.driveLink || p.fileuploadLink).length}
                 </p>
                 <p className="text-sm text-muted-foreground">With Files</p>
               </div>
@@ -305,7 +482,7 @@ const Policies: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center">
             <Filter className="mr-2 h-5 w-5" />
-            Filters & Search
+            Search & Filter
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -316,27 +493,16 @@ const Policies: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Search policies and documents..."
-                  className="w-full pl-10 pr-4 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-[#1d8f5b] focus:border-transparent"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
             </div>
             
-            <div className="flex gap-4">
+            <div>
               <select
-                className="px-4 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="all">All Statuses</option>
-                {uniqueStatuses.map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
-              
-              <select
-                className="px-4 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring"
+                className="px-4 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-[#1d8f5b]"
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
               >
@@ -351,7 +517,7 @@ const Policies: React.FC = () => {
       </Card>
 
       {/* Policies Grid */}
-      <div className="space-y-4">
+      <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
         {filteredPolicies.map((policy) => (
           <PolicyCard key={policy.id} policy={policy} />
         ))}
@@ -368,6 +534,16 @@ const Policies: React.FC = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Policy Modal */}
+      <PolicyModal 
+        policy={selectedPolicy}
+        isOpen={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setSelectedPolicy(null);
+        }}
+      />
     </div>
   );
 };
