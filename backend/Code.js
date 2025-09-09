@@ -1704,8 +1704,8 @@ function getCourseResources(studentEmail) {
           domain: getValue(row, indices.domain) || null,
           subject: getValue(row, indices.subject) || null,
           priority: parseInt(getValue(row, indices.priority)) || 0,
-          createdAt: formatGoogleDate(getValue(row, indices.createdAt)),
-          editedAt: formatGoogleDate(getValue(row, indices.editedAt)),
+          createdAt: formatDisplayDateTime(getValue(row, indices.createdAt)),
+          editedAt: formatDisplayDateTime(getValue(row, indices.editedAt)),
           driveLink: getValue(row, indices.driveLink),
           attachments: getValue(row, indices.driveLink), // Use driveLink for attachments
           resourceLink: getValue(row, indices.driveLink), // Use driveLink for resourceLink  
