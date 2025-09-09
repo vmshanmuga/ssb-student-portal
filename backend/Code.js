@@ -136,6 +136,9 @@ function handleRequest(e) {
       case 'getPoliciesAndDocuments':
         result = getPoliciesAndDocuments(studentEmail);
         break;
+      case 'getCourseResources':
+        result = getCourseResources(studentEmail);
+        break;
       default:
         return createErrorResponse('Unknown action: ' + action);
     }
@@ -1609,6 +1612,242 @@ function getPoliciesAndDocuments(studentEmail) {
     return {
       success: false,
       error: 'Failed to get policies and documents: ' + error.message
+    };
+  }
+}
+
+/**
+ * Get course resources with dynamic hierarchical folder structure
+ * @param {string} studentEmail - Student's email address
+ * @returns {Object} Dynamic folder structure with resources organized by term/domain/subject
+ */
+function getCourseResources(studentEmail) {
+  try {
+    Logger.log(`Getting course resources for: ${studentEmail}`);
+    
+    // Get student profile for batch info
+    const studentProfile = getStudentProfile(studentEmail);
+    if (!studentProfile.success) {
+      Logger.log(`Student profile not found for: ${studentEmail}`);
+      return {
+        success: false,
+        error: 'Student profile not found'
+      };
+    }
+    
+    const student = studentProfile.data;
+    Logger.log(`Student found - Batch: ${student.batch}, Name: ${student.fullName}`);
+    
+    // Get data from main sheet
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(MAIN_SHEET);
+    const data = sheet.getDataRange().getValues();
+    
+    if (data.length <= 2) {
+      Logger.log('Not enough data in sheet - need at least headers and one data row');
+      return {
+        success: true,
+        data: {
+          availableTerms: [],
+          folderStructure: {},
+          flatMaterials: []
+        }
+      };
+    }
+    
+    // Headers are in row 2 (index 1), data starts from row 3 (index 2)
+    const headers = data[1];
+    const indices = getColumnIndices(headers);
+    
+    Logger.log(`Headers found: ${headers.length} columns`);
+    Logger.log(`Column indices mapped: ${Object.keys(indices).length} fields`);
+    
+    const courseMaterials = [];
+    const now = new Date();
+    
+    Logger.log(`Processing ${data.length - 2} data rows for COURSE MATERIAL entries`);
+    
+    // Process each row looking for COURSE MATERIAL entries (start from row 3 = index 2)
+    for (let i = 2; i < data.length; i++) {
+      const row = data[i];
+      
+      // Get category and check if it's COURSE MATERIAL
+      const category = getValue(row, indices.category);
+      
+      // Only process COURSE MATERIAL entries
+      if (category === 'COURSE MATERIAL') {
+        // Get basic info
+        const publish = getValue(row, indices.publish);
+        const status = getValue(row, indices.status);
+        
+        Logger.log(`Row ${i}: Found COURSE MATERIAL - Status: ${status}, Publish: ${publish}`);
+        
+        // Skip non-published or inactive items
+        if (publish !== 'YES' || status !== 'Active') {
+          Logger.log(`Skipping row ${i}: Not published or not active`);
+          continue;
+        }
+        
+        // Check if student is targeted
+        const targetBatch = getValue(row, indices.targetBatch);
+        const targetStudents = getValue(row, indices.targetStudents);
+        const targetedStudents = getTargetedStudents(targetBatch, targetStudents);
+        
+        // Check if this student should see this content
+        const isTargeted = targetedStudents.includes(studentEmail) || 
+                          targetedStudents.includes(student.batch) ||
+                          targetedStudents.includes('ALL');
+        
+        if (!isTargeted) {
+          Logger.log(`Skipping row ${i}: Student not targeted`);
+          continue;
+        }
+        
+        // Get visibility rules
+        const dashboardVisibility = getValue(row, indices.dashboardVisibility);
+        if (dashboardVisibility === 'HIDE') {
+          Logger.log(`Skipping row ${i}: Dashboard visibility is HIDE`);
+          continue;
+        }
+        
+        // Create course material item
+        const materialItem = {
+          id: getValue(row, indices.id),
+          title: getValue(row, indices.title),
+          description: getValue(row, indices.description),
+          term: getValue(row, indices.term) || null,
+          domain: getValue(row, indices.domain) || null,
+          subject: getValue(row, indices.subject) || null,
+          priority: parseInt(getValue(row, indices.priority)) || 0,
+          dateAdded: formatGoogleDate(getValue(row, indices.dateAdded)),
+          lastUpdated: formatGoogleDate(getValue(row, indices.lastUpdated)),
+          attachments: getValue(row, indices.attachments),
+          resourceLink: getValue(row, indices.resourceLink),
+          learningObjectives: getValue(row, indices.learningObjectives),
+          prerequisites: getValue(row, indices.prerequisites),
+          eventType: getValue(row, indices.eventType),
+          tags: getValue(row, indices.tags)
+        };
+        
+        courseMaterials.push(materialItem);
+        Logger.log(`Added course material: ${materialItem.title} [Term: ${materialItem.term}, Domain: ${materialItem.domain}, Subject: ${materialItem.subject}]`);
+      }
+    }
+    
+    Logger.log(`Found ${courseMaterials.length} course materials for student`);
+    
+    // Now build dynamic hierarchical structure
+    const availableTerms = [];
+    const folderStructure = {};
+    
+    // First pass: discover all unique terms, domains, and subjects
+    const termSet = new Set();
+    const termDomainMap = new Map(); // term -> Set of domains
+    const domainSubjectMap = new Map(); // "term|domain" -> Set of subjects
+    
+    courseMaterials.forEach(material => {
+      const term = material.term || 'Other Resources';
+      const domain = material.domain || 'General';
+      const subject = material.subject || 'Miscellaneous';
+      
+      termSet.add(term);
+      
+      if (!termDomainMap.has(term)) {
+        termDomainMap.set(term, new Set());
+      }
+      termDomainMap.get(term).add(domain);
+      
+      const termDomainKey = `${term}|${domain}`;
+      if (!domainSubjectMap.has(termDomainKey)) {
+        domainSubjectMap.set(termDomainKey, new Set());
+      }
+      domainSubjectMap.get(termDomainKey).add(subject);
+    });
+    
+    // Sort terms logically (Term 1 before Term 10, alphabetical for text)
+    const sortedTerms = Array.from(termSet).sort((a, b) => {
+      // Handle "Other Resources" specially - put it last
+      if (a === 'Other Resources') return 1;
+      if (b === 'Other Resources') return -1;
+      
+      // Try to extract numbers for smart sorting
+      const aMatch = a.match(/(\d+)/);
+      const bMatch = b.match(/(\d+)/);
+      
+      if (aMatch && bMatch) {
+        const aNum = parseInt(aMatch[1]);
+        const bNum = parseInt(bMatch[1]);
+        if (aNum !== bNum) return aNum - bNum;
+      }
+      
+      // Fallback to alphabetical
+      return a.localeCompare(b);
+    });
+    
+    availableTerms.push(...sortedTerms);
+    
+    // Second pass: build hierarchical structure and organize materials
+    sortedTerms.forEach(term => {
+      folderStructure[term] = {
+        domains: {}
+      };
+      
+      const domains = Array.from(termDomainMap.get(term)).sort();
+      
+      domains.forEach(domain => {
+        folderStructure[term].domains[domain] = {
+          subjects: {}
+        };
+        
+        const termDomainKey = `${term}|${domain}`;
+        const subjects = Array.from(domainSubjectMap.get(termDomainKey)).sort();
+        
+        subjects.forEach(subject => {
+          // Filter materials for this specific term/domain/subject combination
+          const materialsForSubject = courseMaterials.filter(material => {
+            const materialTerm = material.term || 'Other Resources';
+            const materialDomain = material.domain || 'General';
+            const materialSubject = material.subject || 'Miscellaneous';
+            
+            return materialTerm === term && 
+                   materialDomain === domain && 
+                   materialSubject === subject;
+          });
+          
+          // Sort materials by priority (higher first), then by date
+          materialsForSubject.sort((a, b) => {
+            if (a.priority !== b.priority) {
+              return b.priority - a.priority;
+            }
+            return new Date(b.dateAdded) - new Date(a.dateAdded);
+          });
+          
+          folderStructure[term].domains[domain].subjects[subject] = materialsForSubject;
+        });
+      });
+    });
+    
+    Logger.log(`Built dynamic folder structure with ${availableTerms.length} terms`);
+    
+    return {
+      success: true,
+      data: {
+        availableTerms: availableTerms,
+        folderStructure: folderStructure,
+        flatMaterials: courseMaterials.sort((a, b) => {
+          // Sort flat materials by priority first, then by date
+          if (a.priority !== b.priority) {
+            return b.priority - a.priority;
+          }
+          return new Date(b.dateAdded) - new Date(a.dateAdded);
+        })
+      }
+    };
+    
+  } catch (error) {
+    Logger.log('Error in getCourseResources: ' + error.message);
+    return {
+      success: false,
+      error: 'Failed to get course resources: ' + error.message
     };
   }
 }

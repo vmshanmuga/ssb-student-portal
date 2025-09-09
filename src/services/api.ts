@@ -287,6 +287,32 @@ class ApiService {
     return result;
   }
 
+  // Get course resources with dynamic folder structure
+  async getCourseResources(studentEmail: string): Promise<ApiResponse<{
+    availableTerms: string[];
+    folderStructure: Record<string, {
+      domains: Record<string, {
+        subjects: Record<string, ContentItem[]>;
+      }>;
+    }>;
+    flatMaterials: ContentItem[];
+  }>> {
+    console.log('API Service: Getting course resources for:', studentEmail);
+    const result = await this.makeRequest<{
+      availableTerms: string[];
+      folderStructure: Record<string, {
+        domains: Record<string, {
+          subjects: Record<string, ContentItem[]>;
+        }>;
+      }>;
+      flatMaterials: ContentItem[];
+    }>('getCourseResources', {
+      studentEmail
+    });
+    console.log('API Service: Course resources result:', result);
+    return result;
+  }
+
   // Upload profile picture
   async uploadProfilePicture(studentEmail: string, imageFile: File): Promise<ApiResponse<{ profilePictureUrl: string }>> {
     try {
