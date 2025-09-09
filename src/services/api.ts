@@ -1,5 +1,5 @@
-// Backend API service - New authorized web app deployment
-const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbxeHJsLq9_X8kivAPW35v5DY3IULTKwzqhnD2FPP6tlIhYCnYYdPHwdFoM6VAikqhI7/exec';
+// Backend API service - Public access web app deployment
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwRKFzyAbtRx0fA4fVUtq0A3qjWZ6OqHiOSKDpCP9d5K4iWRKtaNuepUxdQtrlODo0/exec';
 
 export interface StudentProfile {
   email: string;
