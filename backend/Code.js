@@ -1677,35 +1677,21 @@ function getCourseResources(studentEmail) {
       if (category === 'COURSE MATERIAL') {
         // Get basic info
         const publish = getValue(row, indices.publish);
-        const status = getValue(row, indices.status);
         
-        Logger.log(`Row ${i}: Found COURSE MATERIAL - Status: ${status}, Publish: ${publish}`);
+        Logger.log(`Row ${i}: Found COURSE MATERIAL - Publish: ${publish}`);
         
-        // Skip non-published or inactive items
-        if (publish !== 'YES' || status !== 'Active') {
-          Logger.log(`Skipping row ${i}: Not published or not active`);
+        // Skip non-published items (case sensitive: "Yes" not "YES")
+        if (publish !== 'Yes') {
+          Logger.log(`Skipping row ${i}: Not published (${publish})`);
           continue;
         }
         
-        // Check if student is targeted
+        // Check if student is targeted (simplified logic)
         const targetBatch = getValue(row, indices.targetBatch);
-        const targetStudents = getValue(row, indices.targetStudents);
-        const targetedStudents = getTargetedStudents(targetBatch, targetStudents);
         
-        // Check if this student should see this content
-        const isTargeted = targetedStudents.includes(studentEmail) || 
-                          targetedStudents.includes(student.batch) ||
-                          targetedStudents.includes('ALL');
-        
-        if (!isTargeted) {
-          Logger.log(`Skipping row ${i}: Student not targeted`);
-          continue;
-        }
-        
-        // Get visibility rules
-        const dashboardVisibility = getValue(row, indices.dashboardVisibility);
-        if (dashboardVisibility === 'HIDE') {
-          Logger.log(`Skipping row ${i}: Dashboard visibility is HIDE`);
+        // Direct batch comparison instead of complex getTargetedStudents logic
+        if (targetBatch && targetBatch !== 'ALL' && targetBatch !== student.batch) {
+          Logger.log(`Skipping row ${i}: Student batch ${student.batch} not targeted (target: ${targetBatch})`);
           continue;
         }
         
@@ -1713,19 +1699,21 @@ function getCourseResources(studentEmail) {
         const materialItem = {
           id: getValue(row, indices.id),
           title: getValue(row, indices.title),
-          description: getValue(row, indices.description),
+          subTitle: getValue(row, indices.subTitle),
           term: getValue(row, indices.term) || null,
           domain: getValue(row, indices.domain) || null,
           subject: getValue(row, indices.subject) || null,
           priority: parseInt(getValue(row, indices.priority)) || 0,
-          dateAdded: formatGoogleDate(getValue(row, indices.dateAdded)),
-          lastUpdated: formatGoogleDate(getValue(row, indices.lastUpdated)),
-          attachments: getValue(row, indices.attachments),
-          resourceLink: getValue(row, indices.resourceLink),
+          createdAt: formatGoogleDate(getValue(row, indices.createdAt)),
+          editedAt: formatGoogleDate(getValue(row, indices.editedAt)),
+          driveLink: getValue(row, indices.driveLink),
+          attachments: getValue(row, indices.driveLink), // Use driveLink for attachments
+          resourceLink: getValue(row, indices.driveLink), // Use driveLink for resourceLink  
           learningObjectives: getValue(row, indices.learningObjectives),
           prerequisites: getValue(row, indices.prerequisites),
           eventType: getValue(row, indices.eventType),
-          tags: getValue(row, indices.tags)
+          category: getValue(row, indices.category),
+          targetBatch: getValue(row, indices.targetBatch)
         };
         
         courseMaterials.push(materialItem);
