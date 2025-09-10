@@ -60,9 +60,12 @@ export interface ContentItem {
   driveLink?: string;
   sheetsLink?: string;
   fileuploadLink?: string;
+  fileURL?: string;
   hasFiles: boolean;
   isNew: boolean;
   daysUntilDeadline: number | null;
+  isAcknowledged?: boolean;
+  acknowledgmentTimestamp?: string;
   files?: Array<{
     url: string;
     name: string;
@@ -126,6 +129,12 @@ export interface DashboardData {
 export interface ContentDetails extends ContentItem {
   // ContentDetails now inherits all fields including category-specific ones from ContentItem
   // No additional fields needed as targetStudents is now in base ContentItem
+}
+
+export interface ContentItemWithAck extends ContentItem {
+  requiresAcknowledgment: boolean;
+  isAcknowledged: boolean;
+  acknowledgmentTimestamp?: string;
 }
 
 export interface ApiResponse<T> {

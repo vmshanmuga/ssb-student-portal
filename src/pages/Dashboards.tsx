@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth } from '../firebase/config';
 import { apiService } from '../services/api';
+import { CenterLoadingSkeleton } from '../components/ui/loading-skeletons';
 import { 
   LayoutDashboard, 
   ClipboardList, 
@@ -145,8 +146,30 @@ const Dashboards: React.FC = () => {
   if (loading) {
     return (
       <div className="p-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="mb-6 space-y-2">
+          <div className="h-8 bg-muted rounded w-1/3 animate-pulse"></div>
+          <div className="h-5 bg-muted rounded w-2/3 animate-pulse"></div>
+        </div>
+        
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="bg-card rounded-lg p-6 border animate-pulse">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 bg-muted rounded"></div>
+                  <div className="h-6 bg-muted rounded flex-1"></div>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-4 bg-muted rounded w-full"></div>
+                  <div className="h-4 bg-muted rounded w-3/4"></div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="h-6 w-20 bg-muted rounded"></div>
+                  <div className="h-8 w-24 bg-muted rounded"></div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );

@@ -7,6 +7,7 @@ import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Label } from '../components/ui/label';
 import { Separator } from '../components/ui/separator';
+import { ProfileSkeleton } from '../components/ui/loading-skeletons';
 import { 
   User, 
   Edit,
@@ -227,20 +228,7 @@ const Profile: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <Card>
-          <CardContent className="p-8">
-            <div className="animate-pulse space-y-4">
-              <div className="h-8 bg-muted rounded w-1/3"></div>
-              <div className="h-4 bg-muted rounded w-1/2"></div>
-              <div className="h-4 bg-muted rounded w-2/3"></div>
-              <div className="h-32 bg-muted rounded"></div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ProfileSkeleton />;
   }
 
   if (!profile) {

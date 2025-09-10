@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
+import { ListSkeleton } from '../components/ui/loading-skeletons';
 import { 
   ClipboardList, 
   Filter, 
@@ -13,6 +14,7 @@ import {
 import { apiService, type DashboardData, type ContentItem } from '../services/api';
 import { auth } from '../firebase/config';
 import toast from 'react-hot-toast';
+import { formatDate, parseDate } from '../utils/dateUtils';
 
 const Assignments: React.FC = () => {
   const [assignments, setAssignments] = useState<ContentItem[]>([]);
@@ -71,7 +73,12 @@ const Assignments: React.FC = () => {
     .sort((a, b) => {
       switch (sortBy) {
         case 'endDateTime':
-          return new Date(a.endDateTime).getTime() - new Date(b.endDateTime).getTime();
+          const dateA = parseDate(a.endDateTime);
+          const dateB = parseDate(b.endDateTime);
+          if (!dateA && !dateB) return 0;
+          if (!dateA) return 1;
+          if (!dateB) return -1;
+          return dateA.getTime() - dateB.getTime();
         case 'priority':
           const priorityOrder: {[key: string]: number} = { 'High': 3, 'Medium': 2, 'Low': 1 };
           return (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
@@ -136,7 +143,7 @@ const Assignments: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4" />
-                <span>Due: {new Date(assignment.endDateTime).toLocaleDateString()}</span>
+                <span>Due: {formatDate(assignment.endDateTime)}</span>
               </div>
               
               {assignment.daysUntilDeadline !== null && (
@@ -195,22 +202,7 @@ const Assignments: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <div className="animate-pulse">
-                  <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-                  <div className="h-8 bg-muted rounded w-1/2"></div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
+    return <ListSkeleton items={8} showSearch={true} />;
   }
 
   return (

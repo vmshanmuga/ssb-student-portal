@@ -24,7 +24,7 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, setSidebarOpen }) => {
   });
   const [userProfile, setUserProfile] = useState<StudentProfile | null>(null);
   const [fullProfile, setFullProfile] = useState<FullStudentProfile | null>(null);
-  const [welcomeVisible, setWelcomeVisible] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
   const user = auth.currentUser;
 
   useEffect(() => {
@@ -33,20 +33,18 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, setSidebarOpen }) => {
       document.documentElement.classList.add('dark');
     }
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    
-    // Show welcome message after 2 seconds
-    const timer = setTimeout(() => {
-      setWelcomeVisible(true);
-    }, 2000);
-    
-    return () => clearTimeout(timer);
   }, [isDark]);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
-      if (!user?.email) return;
+      if (!user?.email) {
+        setProfileLoading(false);
+        return;
+      }
       
       try {
+        setProfileLoading(true);
+        
         // Get basic profile for name
         const result = await apiService.getStudentProfile(user.email);
         if (result.success && result.data) {
@@ -64,6 +62,8 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, setSidebarOpen }) => {
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
+      } finally {
+        setProfileLoading(false);
       }
     };
 
@@ -103,12 +103,12 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, setSidebarOpen }) => {
             </Button>
             <div>
               <p className="text-lg text-muted-foreground">
-                {welcomeVisible ? (
+                {profileLoading ? (
+                  <span className="opacity-50">Loading...</span>
+                ) : (
                   <span className="animate-fadeIn">
                     Welcome back, {userProfile?.fullName || 'Student'}
                   </span>
-                ) : (
-                  <span className="opacity-50">Loading...</span>
                 )}
               </p>
             </div>

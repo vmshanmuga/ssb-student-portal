@@ -75,6 +75,7 @@ function App() {
             <Route path="assignments" element={<Assignments />} />
             <Route path="announcements" element={<Announcements />} />
             <Route path="resources" element={<Resources />} />
+            <Route path="resources/*" element={<Resources />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="policies" element={<Policies />} />
             <Route path="profile" element={<Profile />} />

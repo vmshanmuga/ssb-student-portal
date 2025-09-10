@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { CalendarSkeleton } from '../components/ui/loading-skeletons';
 import { 
   Calendar as CalendarIcon, 
   ChevronLeft, 
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ContentItem } from '../services/api';
+import { formatDate, formatDateTime as formatDateTimeUtil, formatTime, parseDate } from '../utils/dateUtils';
 
 const Calendar: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -47,12 +49,27 @@ const Calendar: React.FC = () => {
       try {
         setLoading(true);
         console.log('Fetching schedule for user:', user.email);
-        const result = await apiService.getStudentSchedule(user.email);
+        // Try getStudentSchedule first, fall back to dashboard if no data
+        let result = await apiService.getStudentSchedule(user.email);
+        
+        // If no schedule data, get from dashboard and filter for EVENTS and ANNOUNCEMENTS
+        if (!result.success || !result.data || result.data.length === 0) {
+          console.log('Calendar: No schedule data, trying dashboard API...');
+          const dashboardResult = await apiService.getStudentDashboard(user.email);
+          if (dashboardResult.success) {
+            const eventItems = dashboardResult.data!.content.filter(item => 
+              item.category === 'EVENTS' || item.category === 'ANNOUNCEMENTS'
+            );
+            result = { success: true, data: eventItems };
+          }
+        }
         
         console.log('Schedule API response:', result);
         
         if (result.success) {
           console.log('Schedule items found:', result.data?.length || 0);
+          console.log('Calendar: All schedule items:', result.data);
+          console.log('Calendar: Available categories:', Array.from(new Set((result.data || []).map(item => item.category))));
           setScheduleItems(result.data || []);
           setFilteredItems(result.data || []);
         } else {
@@ -101,10 +118,11 @@ const Calendar: React.FC = () => {
 
     // Sort filtered items by start date/time (earliest first)
     filtered.sort((a, b) => {
-      if (!a.startDateTime) return 1;
-      if (!b.startDateTime) return -1;
-      const dateA = new Date(a.startDateTime);
-      const dateB = new Date(b.startDateTime);
+      const dateA = parseDate(a.startDateTime);
+      const dateB = parseDate(b.startDateTime);
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
       return dateA.getTime() - dateB.getTime();
     });
 
@@ -213,8 +231,8 @@ const Calendar: React.FC = () => {
   const getEventsForDate = (day: number) => {
     const targetDate = new Date(currentYear, currentMonth, day);
     return filteredItems.filter(item => {
-      if (!item.startDateTime) return false;
-      const itemDate = new Date(item.startDateTime);
+      const itemDate = parseDate(item.startDateTime);
+      if (!itemDate) return false;
       return itemDate.toDateString() === targetDate.toDateString();
     });
   };
@@ -239,26 +257,27 @@ const Calendar: React.FC = () => {
 
   const formatDateTime = (dateTimeString: string) => {
     if (!dateTimeString) return { date: '', time: '' };
-    const date = new Date(dateTimeString);
+    const date = parseDate(dateTimeString);
+    if (!date) return { date: '', time: '' };
     return {
-      date: date.toLocaleDateString(),
-      time: date.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit', 
-        hour12: true 
-      })
+      date: formatDate(dateTimeString),
+      time: formatTime(dateTimeString)
     };
   };
 
   const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate.getDate()) : [];
   const upcomingEvents = filteredItems
     .filter(item => {
-      if (!item.startDateTime) return false;
-      return new Date(item.startDateTime) >= today;
+      const itemDate = parseDate(item.startDateTime);
+      if (!itemDate) return false;
+      return itemDate >= today;
     })
     .sort((a, b) => {
-      const dateA = new Date(a.startDateTime || '');
-      const dateB = new Date(b.startDateTime || '');
+      const dateA = parseDate(a.startDateTime);
+      const dateB = parseDate(b.startDateTime);
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
       return dateA.getTime() - dateB.getTime();
     })
     .slice(0, 5);
@@ -298,34 +317,7 @@ const Calendar: React.FC = () => {
   }
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-4">
-          {[1, 2, 3, 4].map(i => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <div className="animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        <Card>
-          <CardContent className="p-6">
-            <div className="animate-pulse">
-              <div className="h-6 bg-gray-200 rounded w-1/4 mb-4"></div>
-              <div className="grid grid-cols-7 gap-2">
-                {Array.from({ length: 35 }, (_, i) => (
-                  <div key={i} className="h-16 bg-gray-200 rounded"></div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <CalendarSkeleton />;
   }
 
   return (
@@ -572,11 +564,7 @@ const Calendar: React.FC = () => {
                     <div className="text-sm font-medium mb-1">{day}</div>
                     <div className="space-y-1">
                       {events.slice(0, 2).map(event => {
-                        const eventTime = event.startDateTime ? new Date(event.startDateTime).toLocaleTimeString('en-US', { 
-                          hour: 'numeric', 
-                          minute: '2-digit', 
-                          hour12: true 
-                        }) : '';
+                        const eventTime = event.startDateTime ? formatTime(event.startDateTime) : '';
                         return (
                           <div
                             key={event.id}

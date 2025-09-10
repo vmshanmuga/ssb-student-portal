@@ -2,27 +2,37 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
+import { ListSkeleton } from '../components/ui/loading-skeletons';
 import { 
   Megaphone, 
   Filter, 
   Search, 
   Calendar,
-  User,
   CheckCircle,
   Circle,
-  Eye,
-  Clock
+  Clock,
+  AlertCircle,
+  Bell,
+  X,
+  ExternalLink,
+  MapPin,
+  Users,
+  FileText
 } from 'lucide-react';
-import { apiService, type DashboardData, type ContentItem } from '../services/api';
+import { apiService, type DashboardData, type ContentItem, type ContentItemWithAck } from '../services/api';
 import { auth } from '../firebase/config';
 import toast from 'react-hot-toast';
+import { formatDate, formatDateTime, parseDate } from '../utils/dateUtils';
 
 const Announcements: React.FC = () => {
-  const [announcements, setAnnouncements] = useState<ContentItem[]>([]);
+  const [announcements, setAnnouncements] = useState<ContentItemWithAck[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [readFilter, setReadFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [acknowledgingId, setAcknowledgingId] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<ContentItemWithAck | null>(null);
+  const [showModal, setShowModal] = useState(false);
   const user = auth.currentUser;
 
   useEffect(() => {
@@ -45,10 +55,10 @@ const Announcements: React.FC = () => {
         return;
       }
 
-      // Filter for announcements
+      // Filter for both announcements and events
       const announcementItems = result.data!.content.filter(item => 
-        item.category === 'ANNOUNCEMENTS'
-      );
+        item.category === 'ANNOUNCEMENTS' || item.category === 'EVENTS'
+      ) as ContentItemWithAck[];
       
       setAnnouncements(announcementItems);
       
@@ -60,54 +70,93 @@ const Announcements: React.FC = () => {
     }
   };
 
-  // For demo purposes, we'll use local state for read status
-  const [readStatuses, setReadStatuses] = useState<{[key: string]: boolean}>({});
-
-  const toggleReadStatus = (id: string) => {
-    setReadStatuses(prev => ({
-      ...prev,
-      [id]: !prev[id]
-    }));
-  };
-
-  const markAllAsRead = () => {
-    const newStatuses: {[key: string]: boolean} = {};
-    announcements.forEach(item => {
-      newStatuses[item.id] = true;
-    });
-    setReadStatuses(newStatuses);
-  };
-
-  const filteredAnnouncements = announcements
-    .filter(announcement => {
-      const matchesSearch = announcement.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (announcement.subTitle || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (announcement.content || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = categoryFilter === 'all' || announcement.eventType === categoryFilter;
-      const isRead = readStatuses[announcement.id] || false;
-      const matchesRead = readFilter === 'all' || 
-                         (readFilter === 'read' && isRead) ||
-                         (readFilter === 'unread' && !isRead);
+  const handleAcknowledgment = async (contentId: string) => {
+    if (!user?.email || acknowledgingId) return;
+    
+    try {
+      setAcknowledgingId(contentId);
       
-      return matchesSearch && matchesCategory && matchesRead;
-    })
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const result = await apiService.submitAcknowledgment(contentId, user.email, 'Yes');
+      
+      if (result.success) {
+        // Update the local state
+        setAnnouncements(prev => prev.map(item => 
+          item.id === contentId 
+            ? { ...item, isAcknowledged: true, acknowledgmentTimestamp: new Date().toISOString() }
+            : item
+        ));
+        toast.success('Acknowledged successfully');
+      } else {
+        toast.error(result.error || 'Failed to acknowledge');
+      }
+    } catch (error) {
+      console.error('Error submitting acknowledgment:', error);
+      toast.error('Failed to acknowledge');
+    } finally {
+      setAcknowledgingId(null);
+    }
+  };
+
+  const openModal = (item: ContentItemWithAck) => {
+    setSelectedItem(item);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setSelectedItem(null);
+    setShowModal(false);
+  };
+
+  const getStatusIndicator = (status: string) => {
+    switch(status) {
+      case 'Active': return { 
+        color: 'bg-green-500', 
+        badge: 'LIVE NOW', 
+        pulse: true,
+        textColor: 'text-green-700'
+      };
+      case 'Upcoming': return { 
+        color: 'bg-blue-500', 
+        badge: 'UPCOMING', 
+        pulse: false,
+        textColor: 'text-blue-700'
+      };
+      case 'Expired': return { 
+        color: 'bg-gray-400', 
+        badge: 'ENDED', 
+        pulse: false,
+        textColor: 'text-gray-700'
+      };
+      default: return { 
+        color: 'bg-gray-400', 
+        badge: 'DRAFT', 
+        pulse: false,
+        textColor: 'text-gray-700'
+      };
+    }
+  };
+
+  const getCategoryIcon = (category: string) => {
+    switch(category) {
+      case 'ANNOUNCEMENTS': return <Megaphone className="h-4 w-4 text-blue-600" />;
+      case 'EVENTS': return <Calendar className="h-4 w-4 text-purple-600" />;
+      default: return <Bell className="h-4 w-4 text-gray-600" />;
+    }
+  };
+
+  const getCategoryColor = (category: string) => {
+    switch(category) {
+      case 'ANNOUNCEMENTS': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'EVENTS': return 'bg-purple-100 text-purple-800 border-purple-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'High': return 'bg-red-100 text-red-800 border-red-200';
       case 'Medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'Low': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'Academic': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'Events': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'Career': return 'bg-green-100 text-green-800 border-green-200';
-      case 'Facilities': return 'bg-orange-100 text-orange-800 border-orange-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
@@ -124,97 +173,107 @@ const Announcements: React.FC = () => {
     return announcementDate.toLocaleDateString();
   };
 
-  const unreadCount = announcements.filter(a => !readStatuses[a.id]).length;
-  const categories = Array.from(new Set(announcements.map(a => a.eventType).filter(Boolean)));
-
-  const AnnouncementCard = ({ announcement }: { announcement: ContentItem }) => {
-    const isRead = readStatuses[announcement.id] || false;
-    return (
-    <Card className={`hover:shadow-md transition-all cursor-pointer ${
-      !isRead ? 'ring-2 ring-blue-200 bg-blue-50/30' : ''
-    }`}>
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center space-x-2 mb-2">
-              <button
-                onClick={() => toggleReadStatus(announcement.id)}
-                className="flex-shrink-0"
-              >
-                {isRead ? (
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                ) : (
-                  <Circle className="h-4 w-4 text-blue-600" />
-                )}
-              </button>
-              <CardTitle className={`text-lg ${!isRead ? 'font-bold' : 'font-medium'}`}>
-                {announcement.title}
-              </CardTitle>
-            </div>
-            
-            <div className="flex flex-wrap gap-2 mb-3">
-              <Badge variant="outline" className={getPriorityColor(announcement.priority)}>
-                {announcement.priority} Priority
-              </Badge>
-              <Badge variant="outline" className={getCategoryColor(announcement.eventType || announcement.category)}>
-                {announcement.eventType || announcement.category}
-              </Badge>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <Calendar className="h-4 w-4" />
-            <span>{getTimeAgo(announcement.createdAt)}</span>
-          </div>
-        </div>
-      </CardHeader>
+  const filteredAnnouncements = announcements
+    .filter(announcement => {
+      const matchesSearch = announcement.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (announcement.subTitle || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (announcement.content || '').toLowerCase().includes(searchTerm.toLowerCase());
       
-      <CardContent>
-        <div className="space-y-4">
-          <p className="text-muted-foreground leading-relaxed">
-            {announcement.subTitle || announcement.content}
-          </p>
-          
-          <div className="flex items-center justify-between pt-3 border-t">
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-              <User className="h-4 w-4" />
-              <span>{announcement.postedBy || 'Admin'}</span>
+      const matchesCategory = categoryFilter === 'all' || announcement.category === categoryFilter;
+      
+      const matchesStatus = statusFilter === 'all' || 
+                           (statusFilter === 'live' && announcement.status === 'Active') ||
+                           (statusFilter === 'upcoming' && announcement.status === 'Upcoming') ||
+                           (statusFilter === 'ended' && announcement.status === 'Expired');
+      
+      return matchesSearch && matchesCategory && matchesStatus;
+    })
+    .sort((a, b) => {
+      const dateA = parseDate(a.createdAt);
+      const dateB = parseDate(b.createdAt);
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      return dateB.getTime() - dateA.getTime(); // Newest first
+    });
+
+  const pendingAcknowledgments = announcements.filter(a => a.requiresAcknowledgment && !a.isAcknowledged).length;
+  const liveCount = announcements.filter(a => a.status === 'Active').length;
+  const upcomingCount = announcements.filter(a => a.status === 'Upcoming').length;
+
+  const AnnouncementCard = ({ announcement }: { announcement: ContentItemWithAck }) => {
+    const statusInfo = getStatusIndicator(announcement.status);
+    const isAcknowledging = acknowledgingId === announcement.id;
+    
+    return (
+      <Card className="hover:shadow-md transition-all cursor-pointer" onClick={() => openModal(announcement)}>
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center space-x-2 mb-2">
+                {getCategoryIcon(announcement.category)}
+                <CardTitle className="text-lg">{announcement.title}</CardTitle>
+                
+                {/* Status Badge */}
+                <Badge 
+                  variant="outline" 
+                  className={`${statusInfo.color} text-white border-0 ${statusInfo.pulse ? 'animate-pulse' : ''}`}
+                >
+                  {statusInfo.badge}
+                </Badge>
+              </div>
+              
+              <div className="flex flex-wrap gap-2 mb-3">
+                <Badge variant="outline" className={getCategoryColor(announcement.category)}>
+                  {announcement.category}
+                </Badge>
+                <Badge variant="outline" className={getPriorityColor(announcement.priority)}>
+                  {announcement.priority} Priority
+                </Badge>
+                {announcement.eventType && (
+                  <Badge variant="outline">
+                    {announcement.eventType}
+                  </Badge>
+                )}
+              </div>
             </div>
             
-            <div className="flex items-center space-x-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => toggleReadStatus(announcement.id)}
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                {isRead ? 'Mark Unread' : 'Mark Read'}
-              </Button>
+            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span>{getTimeAgo(announcement.createdAt)}</span>
             </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+        </CardHeader>
+        
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-muted-foreground leading-relaxed">
+              {announcement.subTitle || announcement.content}
+            </p>
+            
+            {/* Acknowledgment status indicator */}
+            {announcement.requiresAcknowledgment && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <AlertCircle className="h-3 w-3 text-blue-600" />
+                  <span className="text-xs text-blue-700">Requires Acknowledgment</span>
+                </div>
+                {announcement.isAcknowledged && (
+                  <div className="flex items-center space-x-1">
+                    <CheckCircle className="h-3 w-3 text-green-600" />
+                    <span className="text-xs text-green-600">Acknowledged</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
   };
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <div className="animate-pulse">
-                  <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-                  <div className="h-8 bg-muted rounded w-1/2"></div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
+    return <ListSkeleton items={8} showSearch={true} />;
   }
 
   return (
@@ -227,7 +286,7 @@ const Announcements: React.FC = () => {
               <Megaphone className="h-5 w-5 text-blue-600" />
               <div>
                 <p className="text-2xl font-bold">{announcements.length}</p>
-                <p className="text-sm text-muted-foreground">Total</p>
+                <p className="text-sm text-muted-foreground">Total Items</p>
               </div>
             </div>
           </CardContent>
@@ -236,10 +295,10 @@ const Announcements: React.FC = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Circle className="h-5 w-5 text-blue-600" />
+              <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
               <div>
-                <p className="text-2xl font-bold">{unreadCount}</p>
-                <p className="text-sm text-muted-foreground">Unread</p>
+                <p className="text-2xl font-bold text-green-600">{liveCount}</p>
+                <p className="text-sm text-muted-foreground">Live Now</p>
               </div>
             </div>
           </CardContent>
@@ -248,10 +307,10 @@ const Announcements: React.FC = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
+              <Clock className="h-5 w-5 text-blue-600" />
               <div>
-                <p className="text-2xl font-bold">{announcements.length - unreadCount}</p>
-                <p className="text-sm text-muted-foreground">Read</p>
+                <p className="text-2xl font-bold text-blue-600">{upcomingCount}</p>
+                <p className="text-sm text-muted-foreground">Upcoming</p>
               </div>
             </div>
           </CardContent>
@@ -260,12 +319,10 @@ const Announcements: React.FC = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Clock className="h-5 w-5 text-orange-600" />
+              <AlertCircle className="h-5 w-5 text-orange-600" />
               <div>
-                <p className="text-2xl font-bold">
-                  {announcements.filter(a => getTimeAgo(a.createdAt) === 'Today').length}
-                </p>
-                <p className="text-sm text-muted-foreground">Today</p>
+                <p className="text-2xl font-bold text-orange-600">{pendingAcknowledgments}</p>
+                <p className="text-sm text-muted-foreground">Need Action</p>
               </div>
             </div>
           </CardContent>
@@ -275,17 +332,10 @@ const Announcements: React.FC = () => {
       {/* Filters and Actions */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center">
-              <Filter className="mr-2 h-5 w-5" />
-              Filters & Search
-            </CardTitle>
-            {unreadCount > 0 && (
-              <Button onClick={markAllAsRead} size="sm">
-                Mark All Read
-              </Button>
-            )}
-          </div>
+          <CardTitle className="flex items-center">
+            <Filter className="mr-2 h-5 w-5" />
+            Filter & Search
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col lg:flex-row gap-4">
@@ -294,7 +344,7 @@ const Announcements: React.FC = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <input
                   type="text"
-                  placeholder="Search announcements..."
+                  placeholder="Search announcements and events..."
                   className="w-full pl-10 pr-4 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -309,26 +359,26 @@ const Announcements: React.FC = () => {
                 onChange={(e) => setCategoryFilter(e.target.value)}
               >
                 <option value="all">All Categories</option>
-                {categories.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
+                <option value="ANNOUNCEMENTS">Announcements</option>
+                <option value="EVENTS">Events</option>
               </select>
               
               <select
                 className="px-4 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring"
-                value={readFilter}
-                onChange={(e) => setReadFilter(e.target.value)}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
               >
                 <option value="all">All Status</option>
-                <option value="unread">Unread</option>
-                <option value="read">Read</option>
+                <option value="live">Live Now</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="ended">Ended</option>
               </select>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Announcements Feed */}
+      {/* Announcements and Events Feed */}
       <div className="space-y-4">
         {filteredAnnouncements.map((announcement) => (
           <AnnouncementCard key={announcement.id} announcement={announcement} />
@@ -339,12 +389,271 @@ const Announcements: React.FC = () => {
         <Card>
           <CardContent className="text-center py-12">
             <Megaphone className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-2">No announcements found</h3>
+            <h3 className="text-lg font-medium text-foreground mb-2">No items found</h3>
             <p className="text-muted-foreground">
               Try adjusting your search or filter criteria
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Detailed Modal */}
+      {showModal && selectedItem && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-background border-b p-4 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                {getCategoryIcon(selectedItem.category)}
+                <div>
+                  <h2 className="text-xl font-semibold">{selectedItem.title}</h2>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <Badge variant="outline" className={getCategoryColor(selectedItem.category)}>
+                      {selectedItem.category}
+                    </Badge>
+                    <Badge 
+                      variant="outline" 
+                      className={`${getStatusIndicator(selectedItem.status).color} text-white border-0 ${getStatusIndicator(selectedItem.status).pulse ? 'animate-pulse' : ''}`}
+                    >
+                      {getStatusIndicator(selectedItem.status).badge}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={closeModal}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Description</h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    {selectedItem.subTitle || selectedItem.content || 'No description available'}
+                  </p>
+                </div>
+
+                {/* Metadata */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2 text-sm">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Created:</span>
+                      <span>{formatDateTime(selectedItem.createdAt)}</span>
+                    </div>
+                    
+                    {selectedItem.postedBy && (
+                      <div className="flex items-center space-x-2 text-sm">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">Posted by:</span>
+                        <span>{selectedItem.postedBy}</span>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center space-x-2 text-sm">
+                      <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Priority:</span>
+                      <Badge variant="outline" className={getPriorityColor(selectedItem.priority)}>
+                        {selectedItem.priority}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {selectedItem.targetBatch && (
+                      <div className="flex items-center space-x-2 text-sm">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">Target Batch:</span>
+                        <span>{selectedItem.targetBatch}</span>
+                      </div>
+                    )}
+                    
+                    {selectedItem.eventType && (
+                      <div className="flex items-center space-x-2 text-sm">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">Event Type:</span>
+                        <span>{selectedItem.eventType}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Event Specific Details */}
+              {selectedItem.category === 'EVENTS' && (
+                <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="flex items-center space-x-2 text-purple-700 mb-4">
+                    <Calendar className="h-5 w-5" />
+                    <h3 className="text-lg font-medium">Event Details</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    {selectedItem.startDateTime && (
+                      <div className="space-y-1">
+                        <span className="font-medium text-purple-700">Start Time:</span>
+                        <p className="text-purple-600">{formatDateTime(selectedItem.startDateTime)}</p>
+                      </div>
+                    )}
+                    
+                    {selectedItem.endDateTime && (
+                      <div className="space-y-1">
+                        <span className="font-medium text-purple-700">End Time:</span>
+                        <p className="text-purple-600">{formatDateTime(selectedItem.endDateTime)}</p>
+                      </div>
+                    )}
+                    
+                    {selectedItem.eventLocation && (
+                      <div className="space-y-1">
+                        <span className="font-medium text-purple-700 flex items-center">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          Location:
+                        </span>
+                        <p className="text-purple-600">{selectedItem.eventLocation}</p>
+                      </div>
+                    )}
+
+                    {selectedItem.eventAgenda && (
+                      <div className="space-y-1 md:col-span-2">
+                        <span className="font-medium text-purple-700">Agenda:</span>
+                        <p className="text-purple-600">{selectedItem.eventAgenda}</p>
+                      </div>
+                    )}
+                    
+                    {selectedItem.speakerInfo && (
+                      <div className="space-y-1 md:col-span-2">
+                        <span className="font-medium text-purple-700">Speaker Info:</span>
+                        <p className="text-purple-600">{selectedItem.speakerInfo}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Files and Links */}
+              {(selectedItem.fileURL || selectedItem.driveLink || selectedItem.sheetsLink || selectedItem.fileuploadLink) && (
+                <div className="space-y-3">
+                  <h3 className="text-lg font-medium flex items-center">
+                    <ExternalLink className="h-5 w-5 mr-2" />
+                    Related Links & Files
+                  </h3>
+                  
+                  <div className="space-y-2">
+                    {selectedItem.fileURL && (
+                      <div className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center space-x-2">
+                          <FileText className="h-4 w-4 text-blue-600" />
+                          <span className="font-medium">File Link</span>
+                        </div>
+                        <Button 
+                          size="sm"
+                          onClick={() => window.open(selectedItem.fileURL!, '_blank')}
+                        >
+                          Open File
+                        </Button>
+                      </div>
+                    )}
+                    
+                    {selectedItem.driveLink && (
+                      <div className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center space-x-2">
+                          <ExternalLink className="h-4 w-4 text-green-600" />
+                          <span className="font-medium">Google Drive</span>
+                        </div>
+                        <Button 
+                          size="sm"
+                          onClick={() => window.open(selectedItem.driveLink!, '_blank')}
+                        >
+                          Open Drive
+                        </Button>
+                      </div>
+                    )}
+                    
+                    {selectedItem.sheetsLink && (
+                      <div className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center space-x-2">
+                          <FileText className="h-4 w-4 text-orange-600" />
+                          <span className="font-medium">Google Sheets</span>
+                        </div>
+                        <Button 
+                          size="sm"
+                          onClick={() => window.open(selectedItem.sheetsLink!, '_blank')}
+                        >
+                          Open Sheets
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Announcement Specific Content */}
+              {selectedItem.category === 'ANNOUNCEMENTS' && (
+                <>
+                  {selectedItem.messageDetails && (
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <h3 className="text-lg font-medium text-blue-700 mb-2">Message Details</h3>
+                      <p className="text-blue-600 text-sm leading-relaxed">{selectedItem.messageDetails}</p>
+                    </div>
+                  )}
+                  
+                  {selectedItem.callToAction && (
+                    <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                      <h3 className="text-lg font-medium text-orange-700 mb-2">Call to Action</h3>
+                      <p className="text-orange-600 text-sm leading-relaxed">{selectedItem.callToAction}</p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Acknowledgment Section */}
+              {selectedItem.requiresAcknowledgment && (
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <AlertCircle className="h-5 w-5 text-blue-600" />
+                      <div>
+                        <h3 className="text-lg font-medium text-blue-700">Acknowledgment Required</h3>
+                        <p className="text-blue-600 text-sm">Please acknowledge that you have read and understood this {selectedItem.category.toLowerCase()}.</p>
+                      </div>
+                    </div>
+                    
+                    {selectedItem.isAcknowledged ? (
+                      <div className="flex items-center space-x-2 text-green-600">
+                        <CheckCircle className="h-5 w-5" />
+                        <div className="text-right">
+                          <p className="font-medium">Acknowledged</p>
+                          {selectedItem.acknowledgmentTimestamp && (
+                            <p className="text-xs text-muted-foreground">
+                              {formatDateTime(selectedItem.acknowledgmentTimestamp)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAcknowledgment(selectedItem.id);
+                        }}
+                        disabled={acknowledgingId === selectedItem.id}
+                      >
+                        {acknowledgingId === selectedItem.id ? 'Acknowledging...' : 'Acknowledge'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end pt-4 border-t">
+                <Button variant="outline" onClick={closeModal}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -7,6 +7,7 @@ const MAIN_SHEET = "ALLINONE";
 const STUDENT_LOGIN_SHEET = "Student Login";
 const STUDENT_DATA_SHEET = "Student Data";
 const STUDENT_PROFILE_SHEET = "Student Profile";
+const ACKNOWLEDGEMENT_SHEET = "Acknowledgement Data";
 const TIMEZONE = "Asia/Kolkata";
 
 // Google Drive configuration for profile pictures
@@ -274,9 +275,9 @@ function getStudentDashboard(studentEmail, lastSync) {
         subject: getValue(row, indices.subject),
         groups: getValue(row, indices.groups),
         postedBy: getValue(row, indices.postedBy),
-        createdAt: formatDisplayDateTime(getValue(row, indices.createdAt)),
-        startDateTime: formatDisplayDateTime(getValue(row, indices.startDateTime)),
-        endDateTime: formatDisplayDateTime(getValue(row, indices.endDateTime)),
+        createdAt: parseDateTime(getValue(row, indices.createdAt))?.toISOString() || null,
+        startDateTime: parseDateTime(getValue(row, indices.startDateTime))?.toISOString() || null,
+        endDateTime: parseDateTime(getValue(row, indices.endDateTime))?.toISOString() || null,
         targetBatch: getValue(row, indices.targetBatch),
         requiresAcknowledgment: getValue(row, indices.requireAcknowledgment) === 'Yes',
         driveLink: getValue(row, indices.driveLink),
@@ -288,6 +289,16 @@ function getStudentDashboard(studentEmail, lastSync) {
 
       // Add category-specific fields based on category
       const category = getValue(row, indices.category);
+      
+      // Add acknowledgment status for ANNOUNCEMENTS and EVENTS
+      if ((category === 'ANNOUNCEMENTS' || category === 'EVENTS') && contentItem.requiresAcknowledgment) {
+        const ackStatus = getAcknowledgmentStatus(contentItem.id, studentEmail);
+        contentItem.isAcknowledged = ackStatus.isAcknowledged;
+        contentItem.acknowledgmentTimestamp = ackStatus.acknowledgmentTimestamp;
+      } else {
+        contentItem.isAcknowledged = false;
+        contentItem.acknowledgmentTimestamp = null;
+      }
       
       switch (category) {
         case 'ASSIGNMENTS & TASKS':
@@ -440,11 +451,11 @@ function getContentDetails(contentId, studentEmail) {
           subject: getValue(row, indices.subject),
           groups: getValue(row, indices.groups),
           postedBy: getValue(row, indices.postedBy),
-          createdAt: formatDisplayDateTime(getValue(row, indices.createdAt)),
-          editedAt: formatDisplayDateTime(getValue(row, indices.editedAt)),
+          createdAt: parseDateTime(getValue(row, indices.createdAt))?.toISOString() || null,
+          editedAt: parseDateTime(getValue(row, indices.editedAt))?.toISOString() || null,
           editedBy: getValue(row, indices.editedBy),
-          startDateTime: formatDisplayDateTime(getValue(row, indices.startDateTime)),
-          endDateTime: formatDisplayDateTime(getValue(row, indices.endDateTime)),
+          startDateTime: parseDateTime(getValue(row, indices.startDateTime))?.toISOString() || null,
+          endDateTime: parseDateTime(getValue(row, indices.endDateTime))?.toISOString() || null,
           targetBatch: getValue(row, indices.targetBatch),
           targetStudents: getValue(row, indices.targetStudents),
           requiresAcknowledgment: getValue(row, indices.requireAcknowledgment) === 'Yes',
@@ -546,7 +557,7 @@ function submitAcknowledgment(contentId, studentEmail, response) {
 
     const student = studentProfile.data;
     
-    // Get content details to find the acknowledgment sheet
+    // Get content details to validate acknowledgment requirement
     const contentDetails = getContentDetails(contentId, studentEmail);
     if (!contentDetails.success) {
       return contentDetails;
@@ -561,33 +572,35 @@ function submitAcknowledgment(contentId, studentEmail, response) {
       };
     }
 
-    if (!content.sheetsLink) {
+    // Use centralized acknowledgment sheet
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const ackSheet = ss.getSheetByName(ACKNOWLEDGEMENT_SHEET);
+    
+    if (!ackSheet) {
       return {
         success: false,
         error: 'Acknowledgment sheet not found'
       };
     }
-
-    // Extract sheet ID from the sheets link
-    const sheetIdMatch = content.sheetsLink.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-    if (!sheetIdMatch) {
-      return {
-        success: false,
-        error: 'Invalid acknowledgment sheet link'
-      };
-    }
-
-    const ackSheetId = sheetIdMatch[1];
-    const ackSheet = SpreadsheetApp.openById(ackSheetId).getActiveSheet();
     
-    // Check if student has already acknowledged
+    // Check if student has already acknowledged this content
     const existingData = ackSheet.getDataRange().getValues();
+    const headers = existingData[0];
+    
+    // Find column indices
+    const idIndex = headers.indexOf('S.ID');
+    const categoryIndex = headers.indexOf('S.Category');
+    const timestampIndex = headers.indexOf('Timestamp');
+    const emailIndex = headers.indexOf('Student Email');
+    const nameIndex = headers.indexOf('Full Name');
+    
+    // Check for existing acknowledgment
     for (let i = 1; i < existingData.length; i++) {
-      if (existingData[i][1] === studentEmail) { // Column B is student email
+      const row = existingData[i];
+      if (row[idIndex] === contentId && row[emailIndex] === studentEmail) {
         // Update existing acknowledgment
         const timestamp = Utilities.formatDate(new Date(), TIMEZONE, "yyyy-MM-dd HH:mm:ss");
-        ackSheet.getRange(i + 1, 1).setValue(timestamp); // Column A - Timestamp
-        ackSheet.getRange(i + 1, 4).setValue(response);  // Column D - Acknowledge
+        ackSheet.getRange(i + 1, timestampIndex + 1).setValue(timestamp);
         
         Logger.log('Updated existing acknowledgment for: ' + studentEmail);
         return {
@@ -599,12 +612,19 @@ function submitAcknowledgment(contentId, studentEmail, response) {
 
     // Add new acknowledgment row
     const timestamp = Utilities.formatDate(new Date(), TIMEZONE, "yyyy-MM-dd HH:mm:ss");
-    const newRow = [
-      timestamp,           // Timestamp
-      studentEmail,        // Student Email
-      student.fullName,    // Student Name  
-      response            // Acknowledge
-    ];
+    const newRow = [];
+    
+    // Initialize all columns to empty
+    for (let i = 0; i < headers.length; i++) {
+      newRow[i] = '';
+    }
+    
+    // Fill in the data
+    if (idIndex >= 0) newRow[idIndex] = contentId;
+    if (categoryIndex >= 0) newRow[categoryIndex] = content.category;
+    if (timestampIndex >= 0) newRow[timestampIndex] = timestamp;
+    if (emailIndex >= 0) newRow[emailIndex] = studentEmail;
+    if (nameIndex >= 0) newRow[nameIndex] = student.fullName;
     
     ackSheet.appendRow(newRow);
     
@@ -1383,7 +1403,7 @@ function getStudentSchedule(studentEmail, startDate, endDate) {
           driveLink: getValue(row, indices.driveLink),
           sheetsLink: getValue(row, indices.sheetsLink),
           requiresAcknowledgment: getValue(row, indices.requireAcknowledgment) === 'Yes',
-          createdAt: formatDisplayDateTime(getValue(row, indices.createdAt))
+          createdAt: parseDateTime(getValue(row, indices.createdAt))?.toISOString() || null
         };
         
         // Add category-specific fields for better calendar display
@@ -1570,8 +1590,8 @@ function getPoliciesAndDocuments(studentEmail) {
           sheetsLink: getValue(row, indices.sheetsLink),
           fileuploadLink: getValue(row, indices.fileuploadLink),
           requiresAcknowledgment: getValue(row, indices.requiresAcknowledgment) === 'Yes',
-          createdAt: formatDisplayDateTime(getValue(row, indices.createdAt)),
-          editedAt: formatDisplayDateTime(getValue(row, indices.editedAt)),
+          createdAt: parseDateTime(getValue(row, indices.createdAt))?.toISOString() || null,
+          editedAt: parseDateTime(getValue(row, indices.editedAt))?.toISOString() || null,
           editedBy: getValue(row, indices.editedBy),
           
           // POLICY & DOCUMENTS specific fields
@@ -1704,11 +1724,12 @@ function getCourseResources(studentEmail) {
           domain: getValue(row, indices.domain) || null,
           subject: getValue(row, indices.subject) || null,
           priority: parseInt(getValue(row, indices.priority)) || 0,
-          createdAt: formatDisplayDateTime(getValue(row, indices.createdAt)),
-          editedAt: formatDisplayDateTime(getValue(row, indices.editedAt)),
+          createdAt: parseDateTime(getValue(row, indices.createdAt))?.toISOString() || null,
+          editedAt: parseDateTime(getValue(row, indices.editedAt))?.toISOString() || null,
           driveLink: getValue(row, indices.driveLink),
-          attachments: getValue(row, indices.driveLink), // Use driveLink for attachments
-          resourceLink: getValue(row, indices.driveLink), // Use driveLink for resourceLink  
+          fileURL: getValue(row, indices.fileURL), // S.File URL field
+          attachments: getValue(row, indices.fileURL) || getValue(row, indices.driveLink), // Use S.File URL first, then driveLink
+          resourceLink: getValue(row, indices.fileURL) || getValue(row, indices.driveLink), // Use S.File URL first, then driveLink  
           learningObjectives: getValue(row, indices.learningObjectives),
           prerequisites: getValue(row, indices.prerequisites),
           eventType: getValue(row, indices.eventType),
@@ -2260,6 +2281,53 @@ function calculateContentStatus(startDateTime, endDateTime) {
 }
 
 /**
+ * Check acknowledgment status for a content item
+ * @param {string} contentId 
+ * @param {string} studentEmail 
+ * @return {Object} acknowledgment status object
+ */
+function getAcknowledgmentStatus(contentId, studentEmail) {
+  try {
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const ackSheet = ss.getSheetByName(ACKNOWLEDGEMENT_SHEET);
+    
+    if (!ackSheet) {
+      Logger.log('Acknowledgement sheet not found');
+      return { isAcknowledged: false, acknowledgmentTimestamp: null };
+    }
+    
+    const ackData = ackSheet.getDataRange().getValues();
+    const headers = ackData[0];
+    
+    // Find column indices
+    const idIndex = headers.indexOf('S.ID');
+    const emailIndex = headers.indexOf('Student Email');
+    const timestampIndex = headers.indexOf('Timestamp');
+    
+    if (idIndex === -1 || emailIndex === -1) {
+      Logger.log('Required columns not found in acknowledgement sheet');
+      return { isAcknowledged: false, acknowledgmentTimestamp: null };
+    }
+    
+    // Check if acknowledgment exists
+    for (let i = 1; i < ackData.length; i++) {
+      const row = ackData[i];
+      if (row[idIndex] === contentId && row[emailIndex] === studentEmail) {
+        return {
+          isAcknowledged: true,
+          acknowledgmentTimestamp: timestampIndex >= 0 ? row[timestampIndex] : null
+        };
+      }
+    }
+    
+    return { isAcknowledged: false, acknowledgmentTimestamp: null };
+  } catch (error) {
+    Logger.log('Error checking acknowledgment status: ' + error.message);
+    return { isAcknowledged: false, acknowledgmentTimestamp: null };
+  }
+}
+
+/**
  * Get column indices mapping for new ALLINONE structure
  * @param {Array} headers Array of header names
  * @return {Object} Column indices mapping
@@ -2386,7 +2454,7 @@ function formatDisplayDateTime(dateValue) {
       return dateValue.toString();
     }
     
-    return Utilities.formatDate(date, TIMEZONE, "yyyy-MM-dd HH:mm");
+    return Utilities.formatDate(date, TIMEZONE, "dd/MM/yyyy HH:mm");
   } catch (error) {
     Logger.log("Error formatting date: " + error.message);
     return dateValue.toString();
