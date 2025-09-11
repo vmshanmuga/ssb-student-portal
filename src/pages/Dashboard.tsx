@@ -11,7 +11,9 @@ import {
   FolderOpen,
   Calendar,
   TrendingUp,
-  BookOpen
+  BookOpen,
+  Users,
+  AtSign
 } from 'lucide-react';
 import { apiService, type DashboardData, type ContentItem } from '../services/api';
 import { auth } from '../firebase/config';
@@ -134,6 +136,7 @@ const Dashboard: React.FC = () => {
       item.category !== 'DASHBOARDS' && 
       item.category !== 'RESOURCES' &&
       item.category !== 'COURSE MATERIAL' &&
+      item.category !== 'STUDENTS CORNER' &&
       item.startDateTime // Must have a start date
     )
     .sort((a, b) => {
@@ -256,6 +259,16 @@ const Dashboard: React.FC = () => {
                 <p className="text-xs text-muted-foreground">Upcoming events</p>
               </div>
             </button>
+            <button 
+              className="w-full flex items-center p-3 text-left border rounded-lg hover:bg-accent transition-colors"
+              onClick={() => navigate('/students-corner')}
+            >
+              <Users className="mr-3 h-4 w-4 text-orange-600" />
+              <div>
+                <p className="text-sm font-medium">Students Corner</p>
+                <p className="text-xs text-muted-foreground">Community activities</p>
+              </div>
+            </button>
           </CardContent>
         </Card>
 
@@ -278,6 +291,10 @@ const Dashboard: React.FC = () => {
                       <Megaphone className="h-5 w-5 text-blue-600" />
                     ) : item.category === 'ASSIGNMENTS & TASKS' ? (
                       <ClipboardList className="h-5 w-5 text-green-600" />
+                    ) : item.category === 'STUDENTS CORNER' && item.eventType === 'MENTION' ? (
+                      <AtSign className="h-5 w-5 text-red-600" />
+                    ) : item.category === 'STUDENTS CORNER' ? (
+                      <Users className="h-5 w-5 text-orange-600" />
                     ) : (
                       <BookOpen className="h-5 w-5 text-primary" />
                     )}
@@ -338,6 +355,10 @@ const Dashboard: React.FC = () => {
                       <Megaphone className="h-4 w-4 text-blue-600" />
                     ) : item.category === 'ASSIGNMENTS & TASKS' ? (
                       <ClipboardList className="h-4 w-4 text-green-600" />
+                    ) : item.category === 'STUDENTS CORNER' && item.eventType === 'MENTION' ? (
+                      <AtSign className="h-4 w-4 text-red-600" />
+                    ) : item.category === 'STUDENTS CORNER' ? (
+                      <Users className="h-4 w-4 text-orange-600" />
                     ) : (
                       <BookOpen className="h-4 w-4 text-primary" />
                     )}

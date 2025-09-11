@@ -1,3 +1,6 @@
+// Students Corner type imports
+import { StudentsCornerActivity, StudentsCornerDashboardData, LeaderboardEntry } from '../types/studentsCorner';
+
 // Backend API service - Public access web app deployment
 const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbyqKqx5TqZgISdbekc5kOCOQT-U8Awy8fTVb4w0cLzEO2VxDjrO7MPVX09tXuQfVBKb/exec';
 
@@ -404,6 +407,148 @@ class ApiService {
       studentEmail,
       ...filters
     });
+  }
+
+  // Students Corner API Methods
+
+  // Get Students Corner activities
+  async getStudentsCornerActivity(
+    studentEmail: string,
+    activityType?: string,
+    limit?: number
+  ): Promise<ApiResponse<StudentsCornerActivity[]>> {
+    console.log('API Service: Getting Students Corner activity for:', studentEmail);
+    const result = await this.makeRequest<StudentsCornerActivity[]>('getStudentsCornerActivity', {
+      studentEmail,
+      activityType,
+      limit: limit?.toString()
+    });
+    console.log('API Service: Students Corner activity result:', result);
+    return result;
+  }
+
+  // Create Students Corner post/activity
+  async createStudentsCornerPost(
+    studentEmail: string,
+    type: string,
+    title: string,
+    content: string,
+    targetBatch?: string,
+    category?: string,
+    metadata?: string
+  ): Promise<ApiResponse<{ id: string; type: string; title: string; points: number; message: string }>> {
+    console.log('API Service: Creating Students Corner post:', { type, title });
+    const result = await this.makeRequest<{ id: string; type: string; title: string; points: number; message: string }>('createStudentsCornerPost', {
+      studentEmail,
+      type,
+      title,
+      content,
+      targetBatch,
+      category,
+      metadata
+    });
+    console.log('API Service: Create post result:', result);
+    return result;
+  }
+
+  // Get Students Corner leaderboard
+  async getStudentsCornerLeaderboard(
+    studentEmail: string,
+    timeframe?: string
+  ): Promise<ApiResponse<LeaderboardEntry[]>> {
+    console.log('API Service: Getting Students Corner leaderboard for:', studentEmail);
+    const result = await this.makeRequest<LeaderboardEntry[]>('getStudentsCornerLeaderboard', {
+      studentEmail,
+      timeframe
+    });
+    console.log('API Service: Leaderboard result:', result);
+    return result;
+  }
+
+  // Update activity status
+  async updateActivityStatus(
+    activityId: string,
+    status: string,
+    studentEmail: string
+  ): Promise<ApiResponse<{ id: string; newStatus: string; message: string }>> {
+    console.log('API Service: Updating activity status:', activityId, 'to', status);
+    const result = await this.makeRequest<{ id: string; newStatus: string; message: string }>('updateActivityStatus', {
+      activityId,
+      status,
+      studentEmail
+    });
+    console.log('API Service: Update status result:', result);
+    return result;
+  }
+
+  // Get Students Corner dashboard
+  async getStudentsCornerDashboard(
+    studentEmail: string
+  ): Promise<ApiResponse<StudentsCornerDashboardData>> {
+    console.log('API Service: Getting Students Corner dashboard for:', studentEmail);
+    const result = await this.makeRequest<StudentsCornerDashboardData>('getStudentsCornerDashboard', {
+      studentEmail
+    });
+    console.log('API Service: Students Corner dashboard result:', result);
+    return result;
+  }
+
+  // Create engagement (like or comment)
+  async createStudentsCornerEngagement(
+    studentEmail: string,
+    activityId: string,
+    engagementType: 'LIKE' | 'COMMENT',
+    commentText?: string
+  ): Promise<ApiResponse<any>> {
+    console.log('API Service: Creating engagement:', { activityId, engagementType, commentText });
+    const result = await this.makeRequest('createStudentsCornerEngagement', {
+      studentEmail,
+      activityId,
+      engagementType,
+      commentText: commentText || ''
+    });
+    console.log('API Service: Create engagement result:', result);
+    return result;
+  }
+
+  // Get engagements for an activity
+  async getStudentsCornerEngagements(
+    studentEmail: string,
+    activityId: string
+  ): Promise<ApiResponse<any>> {
+    console.log('API Service: Getting engagements for activity:', activityId);
+    const result = await this.makeRequest('getStudentsCornerEngagements', {
+      studentEmail,
+      activityId
+    });
+    console.log('API Service: Get engagements result:', result);
+    return result;
+  }
+
+  // Remove engagement (unlike)
+  async removeStudentsCornerEngagement(
+    studentEmail: string,
+    activityId: string,
+    engagementType: 'LIKE' | 'COMMENT'
+  ): Promise<ApiResponse<any>> {
+    console.log('API Service: Removing engagement:', { activityId, engagementType });
+    const result = await this.makeRequest('removeStudentsCornerEngagement', {
+      studentEmail,
+      activityId,
+      engagementType
+    });
+    console.log('API Service: Remove engagement result:', result);
+    return result;
+  }
+
+  // Get students for @ mentions
+  async getStudentsForMentions(studentEmail: string): Promise<ApiResponse<any>> {
+    console.log('API Service: Getting students for mentions');
+    const result = await this.makeRequest('getStudentsForMentions', {
+      studentEmail
+    });
+    console.log('API Service: Get students for mentions result:', result);
+    return result;
   }
 }
 

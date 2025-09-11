@@ -13,6 +13,7 @@ import Resources from './pages/Resources';
 import Calendar from './pages/Calendar';
 import Policies from './pages/Policies';
 import Profile from './pages/Profile';
+import StudentsCorner from './pages/StudentsCorner';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -76,6 +77,7 @@ function App() {
             <Route path="announcements" element={<Announcements />} />
             <Route path="resources" element={<Resources />} />
             <Route path="resources/*" element={<Resources />} />
+            <Route path="students-corner" element={<StudentsCorner />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="policies" element={<Policies />} />
             <Route path="profile" element={<Profile />} />

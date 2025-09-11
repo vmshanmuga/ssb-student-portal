@@ -9,7 +9,8 @@ import {
   FileText,
   User,
   Menu,
-  BarChart3
+  BarChart3,
+  Users
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
@@ -25,6 +26,7 @@ const navigation = [
   { name: 'Assignments', href: '/assignments', icon: ClipboardList },
   { name: 'Events & Announcements', href: '/announcements', icon: Megaphone },
   { name: 'Resources', href: '/resources', icon: FolderOpen },
+  { name: 'Students Corner', href: '/students-corner', icon: Users },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Policy & Documents', href: '/policies', icon: FileText },
   { name: 'Profile', href: '/profile', icon: User },

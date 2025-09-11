@@ -8,6 +8,8 @@ const STUDENT_LOGIN_SHEET = "Student Login";
 const STUDENT_DATA_SHEET = "Student Data";
 const STUDENT_PROFILE_SHEET = "Student Profile";
 const ACKNOWLEDGEMENT_SHEET = "Acknowledgement Data";
+const STUDENTS_CORNER_SHEET = "Students Corner - Activity";
+const STUDENTS_CORNER_ENGAGEMENT_SHEET = "Students Corner - Engagement";
 const TIMEZONE = "Asia/Kolkata";
 
 // Google Drive configuration for profile pictures
@@ -139,6 +141,33 @@ function handleRequest(e) {
         break;
       case 'getCourseResources':
         result = getCourseResources(studentEmail);
+        break;
+      case 'getStudentsCornerActivity':
+        result = getStudentsCornerActivity(studentEmail, params.activityType, params.limit);
+        break;
+      case 'createStudentsCornerPost':
+        result = createStudentsCornerPost(studentEmail, params.type, params.title, params.content, params.targetBatch, params.category, params.metadata);
+        break;
+      case 'getStudentsCornerLeaderboard':
+        result = getStudentsCornerLeaderboard(studentEmail, params.timeframe);
+        break;
+      case 'updateActivityStatus':
+        result = updateActivityStatus(params.activityId, params.status, studentEmail);
+        break;
+      case 'getStudentsCornerDashboard':
+        result = getStudentsCornerDashboard(studentEmail);
+        break;
+      case 'createStudentsCornerEngagement':
+        result = createStudentsCornerEngagement(params.activityId, studentEmail, params.engagementType, params.commentText);
+        break;
+      case 'getStudentsCornerEngagements':
+        result = getStudentsCornerEngagements(params.activityId, studentEmail);
+        break;
+      case 'removeStudentsCornerEngagement':
+        result = removeStudentsCornerEngagement(params.activityId, studentEmail, params.engagementType);
+        break;
+      case 'getStudentsForMentions':
+        result = getStudentsForMentions(studentEmail);
         break;
       default:
         return createErrorResponse('Unknown action: ' + action);
@@ -346,6 +375,193 @@ function getStudentDashboard(studentEmail, lastSync) {
       if (currentStatus === 'Active') stats.active++;
       if (currentStatus === 'Upcoming') stats.upcoming++;
       if (contentItem.requiresAcknowledgment) stats.requiresAck++;
+    }
+
+    // Add Students Corner activities to dashboard content
+    try {
+      const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+      const studentsCornerSheet = spreadsheet.getSheetByName(STUDENTS_CORNER_SHEET);
+      
+      if (studentsCornerSheet) {
+        const data = studentsCornerSheet.getDataRange().getValues();
+        
+        if (data.length > 1) {
+          const headers = data[0];
+          const colMap = {
+            id: headers.indexOf('S.ID'),
+            type: headers.indexOf('S.Type'),
+            studentEmail: headers.indexOf('S.Student Email'),
+            fullName: headers.indexOf('S.Full Name'),
+            batch: headers.indexOf('S.Batch'),
+            timestamp: headers.indexOf('S.Timestamp'),
+            status: headers.indexOf('S.Status'),
+            points: headers.indexOf('S.Points'),
+            title: headers.indexOf('S.Title'),
+            content: headers.indexOf('S.Content'),
+            targetBatch: headers.indexOf('S.Target Batch'),
+            category: headers.indexOf('S.Category'),
+            metadata: headers.indexOf('S.Metadata')
+          };
+          
+          // Get recent activities with raw timestamps
+          const recentActivities = [];
+          for (let i = 1; i < data.length && recentActivities.length < 10; i++) {
+            const row = data[i];
+            
+            // Skip if no student has access (simplified check)
+            const targetBatch = row[colMap.targetBatch] || '';
+            if (targetBatch && targetBatch !== 'All' && targetBatch !== student.batch) continue;
+            
+            // Get raw timestamp and convert to ISO
+            const rawTimestamp = row[colMap.timestamp];
+            let isoTimestamp = null;
+            try {
+              if (rawTimestamp instanceof Date) {
+                isoTimestamp = rawTimestamp.toISOString();
+              } else if (rawTimestamp) {
+                // Parse various timestamp formats
+                const parsedDate = parseDateTime(rawTimestamp);
+                isoTimestamp = parsedDate ? parsedDate.toISOString() : new Date().toISOString();
+              }
+            } catch (e) {
+              Logger.log('Error parsing Students Corner timestamp: ' + e.message);
+              isoTimestamp = new Date().toISOString();
+            }
+            
+            const studentsCornerItem = {
+              id: `students-corner-${row[colMap.id] || i}`,
+              category: 'STUDENTS CORNER',
+              eventType: row[colMap.type] || 'POST',
+              title: row[colMap.title] || 'Untitled',
+              subTitle: `${row[colMap.type] || 'POST'} by ${row[colMap.fullName] || 'Student'}`,
+              content: (row[colMap.content] || '').substring(0, 200) + '...', // Truncate for dashboard
+              priority: 'Medium',
+              status: 'Active',
+              term: '',
+              subject: row[colMap.category] || 'General',
+              groups: row[colMap.batch] || '',
+              postedBy: row[colMap.fullName] || 'Student',
+              createdAt: isoTimestamp,
+              startDateTime: isoTimestamp,
+              endDateTime: null,
+              targetBatch: row[colMap.targetBatch] || 'All',
+              requiresAcknowledgment: false,
+              driveLink: '',
+              studentsCornerType: row[colMap.type] || 'POST',
+              studentsCornerPoints: parseInt(row[colMap.points]) || 0,
+              studentsCornerMetadata: row[colMap.metadata] || '{}'
+            };
+            
+            recentActivities.push(studentsCornerItem);
+          }
+          
+          // Add all recent activities to content
+          recentActivities.forEach(item => {
+            filteredContent.push(item);
+            stats.total++;
+            stats.active++;
+          });
+          
+          Logger.log(`Added ${recentActivities.length} Students Corner activities to dashboard`);
+        }
+      }
+    } catch (error) {
+      Logger.log('Error adding Students Corner activities to dashboard: ' + error.message);
+      // Continue without Students Corner activities if there's an error
+    }
+
+    // Add Students Corner tag notifications
+    try {
+      const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+      const engagementSheet = spreadsheet.getSheetByName(STUDENTS_CORNER_ENGAGEMENT_SHEET);
+      
+      if (engagementSheet) {
+        const data = engagementSheet.getDataRange().getValues();
+        
+        if (data.length > 1) {
+          const headers = data[0];
+          const engColMap = {
+            id: headers.indexOf('ID'),
+            activityId: headers.indexOf('Activity ID'),
+            studentEmail: headers.indexOf('Student Email'),
+            fullName: headers.indexOf('Full Name'),
+            batch: headers.indexOf('Batch'),
+            timestamp: headers.indexOf('Timestamp'),
+            engagementType: headers.indexOf('Engagement Type'),
+            commentText: headers.indexOf('Comment Text'),
+            points: headers.indexOf('Points')
+          };
+          
+          // Look for recent comments where current student is mentioned
+          const tagNotifications = [];
+          for (let i = 1; i < data.length && tagNotifications.length < 5; i++) {
+            const row = data[i];
+            
+            // Only check comments
+            if (row[engColMap.engagementType] !== 'COMMENT') continue;
+            
+            // Check if current student is mentioned in the comment
+            const commentText = row[engColMap.commentText] || '';
+            if (!commentText.includes(`@${student.fullName}`)) continue;
+            
+            // Skip if the comment is by the current student (they don't need notification of their own comment)
+            if (row[engColMap.studentEmail] === studentEmail) continue;
+            
+            // Get raw timestamp and convert to ISO
+            const rawTimestamp = row[engColMap.timestamp];
+            let isoTimestamp = null;
+            try {
+              if (rawTimestamp instanceof Date) {
+                isoTimestamp = rawTimestamp.toISOString();
+              } else if (rawTimestamp) {
+                const parsedDate = parseDateTime(rawTimestamp);
+                isoTimestamp = parsedDate ? parsedDate.toISOString() : new Date().toISOString();
+              }
+            } catch (e) {
+              Logger.log('Error parsing engagement timestamp: ' + e.message);
+              isoTimestamp = new Date().toISOString();
+            }
+            
+            const tagNotification = {
+              id: `tag-notification-${row[engColMap.id] || i}`,
+              category: 'STUDENTS CORNER',
+              eventType: 'MENTION',
+              title: `You were mentioned in a comment`,
+              subTitle: `${row[engColMap.fullName]} mentioned you`,
+              content: commentText,
+              priority: 'High',
+              status: 'Active',
+              term: '',
+              subject: 'Mention',
+              groups: row[engColMap.batch] || '',
+              postedBy: row[engColMap.fullName] || 'Student',
+              createdAt: isoTimestamp,
+              startDateTime: isoTimestamp,
+              endDateTime: null,
+              targetBatch: 'All',
+              requiresAcknowledgment: false,
+              driveLink: '',
+              studentsCornerType: 'MENTION',
+              studentsCornerPoints: 0,
+              studentsCornerActivityId: row[engColMap.activityId] || ''
+            };
+            
+            tagNotifications.push(tagNotification);
+          }
+          
+          // Add all tag notifications to content
+          tagNotifications.forEach(item => {
+            filteredContent.push(item);
+            stats.total++;
+            stats.active++;
+          });
+          
+          Logger.log(`Added ${tagNotifications.length} tag notifications to dashboard`);
+        }
+      }
+    } catch (error) {
+      Logger.log('Error adding tag notifications to dashboard: ' + error.message);
+      // Continue without tag notifications if there's an error
     }
 
     // Sort by created date (newest first)
@@ -2454,7 +2670,7 @@ function formatDisplayDateTime(dateValue) {
       return dateValue.toString();
     }
     
-    return Utilities.formatDate(date, TIMEZONE, "dd/MM/yyyy HH:mm");
+    return Utilities.formatDate(date, TIMEZONE, "dd/MM/yyyy HH:mm:ss");
   } catch (error) {
     Logger.log("Error formatting date: " + error.message);
     return dateValue.toString();
@@ -3280,6 +3496,903 @@ function getContentInteractionSummary(contentId) {
     return {
       success: false,
       error: 'Failed to get interaction summary: ' + error.message
+    };
+  }
+}
+
+/**
+ * STUDENTS CORNER FUNCTIONS
+ * 
+ * These functions handle all Students Corner functionality including:
+ * - Activity creation (posts, forums, events, skills)
+ * - Activity retrieval with filtering
+ * - Leaderboard and points system
+ * - Dashboard overview
+ */
+
+/**
+ * Get Students Corner activity with optional filtering
+ * @param {string} studentEmail - Student's email address
+ * @param {string} activityType - Optional filter by type (POST, FORUM, EVENT, SKILL_OFFER, SKILL_REQUEST)
+ * @param {number} limit - Optional limit on number of activities returned
+ * @return {Object} Activity data
+ */
+function getStudentsCornerActivity(studentEmail, activityType, limit) {
+  try {
+    Logger.log('Getting Students Corner activity for: ' + studentEmail);
+    
+    // Get student profile to determine batch and access
+    const studentProfile = getStudentProfile(studentEmail);
+    if (!studentProfile.success) {
+      return studentProfile;
+    }
+    
+    const student = studentProfile.data;
+    
+    // Get or create Students Corner sheet
+    const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+    let sheet = spreadsheet.getSheetByName(STUDENTS_CORNER_SHEET);
+    
+    // Create sheet if it doesn't exist
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(STUDENTS_CORNER_SHEET);
+      // Add headers
+      const headers = [
+        'S.ID', 'S.Type', 'S.Student Email', 'S.Full Name', 'S.Batch', 
+        'S.Timestamp', 'S.Status', 'S.Points', 'S.Title', 'S.Content', 
+        'S.Target Batch', 'S.Category', 'S.Metadata'
+      ];
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    
+    if (data.length <= 1) {
+      return {
+        success: true,
+        data: []
+      };
+    }
+    
+    const headers = data[0];
+    const activities = [];
+    
+    // Column mappings
+    const colMap = {
+      id: headers.indexOf('S.ID'),
+      type: headers.indexOf('S.Type'),
+      studentEmail: headers.indexOf('S.Student Email'),
+      fullName: headers.indexOf('S.Full Name'),
+      batch: headers.indexOf('S.Batch'),
+      timestamp: headers.indexOf('S.Timestamp'),
+      status: headers.indexOf('S.Status'),
+      points: headers.indexOf('S.Points'),
+      title: headers.indexOf('S.Title'),
+      content: headers.indexOf('S.Content'),
+      targetBatch: headers.indexOf('S.Target Batch'),
+      category: headers.indexOf('S.Category'),
+      metadata: headers.indexOf('S.Metadata')
+    };
+    
+    // Process activities
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      
+      // Check if activity is targeted to student's batch or is public
+      const targetBatch = row[colMap.targetBatch] || '';
+      const isTargeted = !targetBatch || 
+                        targetBatch === 'All' || 
+                        targetBatch.includes(student.batch);
+      
+      if (!isTargeted) continue;
+      
+      // Check status filter (only show active activities)
+      if (row[colMap.status] !== 'Active') continue;
+      
+      // Check activity type filter
+      if (activityType && row[colMap.type] !== activityType) continue;
+      
+      const activity = {
+        id: row[colMap.id] || '',
+        type: row[colMap.type] || '',
+        studentEmail: row[colMap.studentEmail] || '',
+        fullName: row[colMap.fullName] || '',
+        batch: row[colMap.batch] || '',
+        timestamp: formatDisplayDateTime(row[colMap.timestamp]),
+        status: row[colMap.status] || '',
+        points: parseInt(row[colMap.points]) || 0,
+        title: row[colMap.title] || '',
+        content: row[colMap.content] || '',
+        targetBatch: row[colMap.targetBatch] || '',
+        category: row[colMap.category] || '',
+        metadata: row[colMap.metadata] || '{}'
+      };
+      
+      activities.push(activity);
+    }
+    
+    // Sort by timestamp (newest first)
+    activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    // Apply limit if specified
+    const limitedActivities = limit ? activities.slice(0, parseInt(limit)) : activities;
+    
+    return {
+      success: true,
+      data: limitedActivities
+    };
+    
+  } catch (error) {
+    Logger.log('Error in getStudentsCornerActivity: ' + error.message);
+    return {
+      success: false,
+      error: 'Failed to get Students Corner activity: ' + error.message
+    };
+  }
+}
+
+/**
+ * Create a new Students Corner post/activity
+ * @param {string} studentEmail - Student's email address
+ * @param {string} type - Activity type (POST, FORUM, EVENT, SKILL_OFFER, SKILL_REQUEST)
+ * @param {string} title - Activity title
+ * @param {string} content - Activity content/description
+ * @param {string} targetBatch - Target batch (optional, defaults to student's batch)
+ * @param {string} category - Category/tag for the activity
+ * @param {string} metadata - JSON string with additional metadata
+ * @return {Object} Creation result
+ */
+function createStudentsCornerPost(studentEmail, type, title, content, targetBatch, category, metadata) {
+  try {
+    Logger.log('Creating Students Corner post for: ' + studentEmail);
+    
+    // Get student profile
+    const studentProfile = getStudentProfile(studentEmail);
+    if (!studentProfile.success) {
+      return studentProfile;
+    }
+    
+    const student = studentProfile.data;
+    
+    // Validate required fields
+    if (!type || !title || !content) {
+      return {
+        success: false,
+        error: 'Missing required fields: type, title, content'
+      };
+    }
+    
+    // Validate activity type
+    const validTypes = ['POST', 'FORUM', 'EVENT', 'SKILL_OFFER', 'SKILL_REQUEST'];
+    if (!validTypes.includes(type)) {
+      return {
+        success: false,
+        error: 'Invalid activity type. Must be one of: ' + validTypes.join(', ')
+      };
+    }
+    
+    // Get or create Students Corner sheet
+    const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+    let sheet = spreadsheet.getSheetByName(STUDENTS_CORNER_SHEET);
+    
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(STUDENTS_CORNER_SHEET);
+      // Add headers
+      const headers = [
+        'S.ID', 'S.Type', 'S.Student Email', 'S.Full Name', 'S.Batch', 
+        'S.Timestamp', 'S.Status', 'S.Points', 'S.Title', 'S.Content', 
+        'S.Target Batch', 'S.Category', 'S.Metadata'
+      ];
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    }
+    
+    // Generate unique ID
+    const timestamp = new Date();
+    const activityId = 'SC_' + timestamp.getTime() + '_' + Math.random().toString(36).substr(2, 5);
+    
+    // Calculate points based on activity type
+    const pointsMap = {
+      'POST': 10,
+      'FORUM': 5,
+      'EVENT': 25,
+      'SKILL_OFFER': 15,
+      'SKILL_REQUEST': 10
+    };
+    const points = pointsMap[type] || 5;
+    
+    // Set default target batch if not specified
+    const finalTargetBatch = targetBatch || student.batch;
+    
+    // Create new row data
+    const newRow = [
+      activityId,
+      type,
+      studentEmail,
+      student.fullName,
+      student.batch,
+      Utilities.formatDate(timestamp, TIMEZONE, "dd/MM/yyyy HH:mm:ss"),
+      'Active',
+      points,
+      title,
+      content,
+      finalTargetBatch,
+      category || 'General',
+      metadata || '{}'
+    ];
+    
+    // Add to sheet
+    sheet.appendRow(newRow);
+    
+    Logger.log('Students Corner activity created with ID: ' + activityId);
+    
+    return {
+      success: true,
+      data: {
+        id: activityId,
+        type: type,
+        title: title,
+        points: points,
+        message: 'Activity created successfully'
+      }
+    };
+    
+  } catch (error) {
+    Logger.log('Error in createStudentsCornerPost: ' + error.message);
+    return {
+      success: false,
+      error: 'Failed to create Students Corner post: ' + error.message
+    };
+  }
+}
+
+/**
+ * Get Students Corner leaderboard
+ * @param {string} studentEmail - Student's email address  
+ * @param {string} timeframe - Optional timeframe filter (week, month, all)
+ * @return {Object} Leaderboard data
+ */
+function getStudentsCornerLeaderboard(studentEmail, timeframe) {
+  try {
+    Logger.log('Getting Students Corner leaderboard for: ' + studentEmail);
+    
+    // Get student profile to determine batch
+    const studentProfile = getStudentProfile(studentEmail);
+    if (!studentProfile.success) {
+      return studentProfile;
+    }
+    
+    const student = studentProfile.data;
+    
+    // Get Students Corner sheet
+    const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+    const sheet = spreadsheet.getSheetByName(STUDENTS_CORNER_SHEET);
+    
+    if (!sheet) {
+      return {
+        success: true,
+        data: []
+      };
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    
+    if (data.length <= 1) {
+      return {
+        success: true,
+        data: []
+      };
+    }
+    
+    const headers = data[0];
+    const studentPoints = new Map();
+    
+    // Column mappings
+    const colMap = {
+      studentEmail: headers.indexOf('S.Student Email'),
+      fullName: headers.indexOf('S.Full Name'),
+      batch: headers.indexOf('S.Batch'),
+      timestamp: headers.indexOf('S.Timestamp'),
+      status: headers.indexOf('S.Status'),
+      points: headers.indexOf('S.Points')
+    };
+    
+    // Calculate timeframe cutoff
+    let cutoffDate = null;
+    if (timeframe === 'week') {
+      cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - 7);
+    } else if (timeframe === 'month') {
+      cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - 30);
+    }
+    
+    // Aggregate points by student
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      
+      // Only count active activities
+      if (row[colMap.status] !== 'Active') continue;
+      
+      // Apply timeframe filter if specified
+      if (cutoffDate) {
+        const activityDate = new Date(row[colMap.timestamp]);
+        if (activityDate < cutoffDate) continue;
+      }
+      
+      const email = row[colMap.studentEmail];
+      const fullName = row[colMap.fullName];
+      const batch = row[colMap.batch];
+      const points = parseInt(row[colMap.points]) || 0;
+      
+      if (!studentPoints.has(email)) {
+        studentPoints.set(email, {
+          studentEmail: email,
+          fullName: fullName,
+          batch: batch,
+          totalPoints: 0,
+          recentActivity: 0
+        });
+      }
+      
+      const studentData = studentPoints.get(email);
+      studentData.totalPoints += points;
+      studentData.recentActivity += 1;
+    }
+    
+    // Add engagement points for each student
+    for (const [email, studentData] of studentPoints) {
+      const engagementPoints = getStudentEngagementPoints(email);
+      studentData.totalPoints += engagementPoints;
+    }
+    
+    // Convert to array and sort by points
+    const leaderboard = Array.from(studentPoints.values())
+      .sort((a, b) => b.totalPoints - a.totalPoints)
+      .map((entry, index) => ({
+        ...entry,
+        rank: index + 1
+      }));
+    
+    // Limit to top 20 for performance
+    const topLeaderboard = leaderboard.slice(0, 20);
+    
+    return {
+      success: true,
+      data: topLeaderboard
+    };
+    
+  } catch (error) {
+    Logger.log('Error in getStudentsCornerLeaderboard: ' + error.message);
+    return {
+      success: false,
+      error: 'Failed to get leaderboard: ' + error.message
+    };
+  }
+}
+
+/**
+ * Update activity status (for moderation)
+ * @param {string} activityId - Activity ID to update
+ * @param {string} status - New status (Active, Archived, Flagged, Pending)
+ * @param {string} studentEmail - Email of student making the request
+ * @return {Object} Update result
+ */
+function updateActivityStatus(activityId, status, studentEmail) {
+  try {
+    Logger.log('Updating activity status: ' + activityId + ' to ' + status);
+    
+    // Validate status
+    const validStatuses = ['Active', 'Archived', 'Flagged', 'Pending'];
+    if (!validStatuses.includes(status)) {
+      return {
+        success: false,
+        error: 'Invalid status. Must be one of: ' + validStatuses.join(', ')
+      };
+    }
+    
+    // Get Students Corner sheet
+    const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+    const sheet = spreadsheet.getSheetByName(STUDENTS_CORNER_SHEET);
+    
+    if (!sheet) {
+      return {
+        success: false,
+        error: 'Students Corner sheet not found'
+      };
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    
+    const colMap = {
+      id: headers.indexOf('S.ID'),
+      status: headers.indexOf('S.Status'),
+      studentEmail: headers.indexOf('S.Student Email')
+    };
+    
+    // Find the activity
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][colMap.id] === activityId) {
+        // Check if user owns this activity (basic permission check)
+        const activityOwner = data[i][colMap.studentEmail];
+        if (activityOwner !== studentEmail) {
+          return {
+            success: false,
+            error: 'You can only modify your own activities'
+          };
+        }
+        
+        // Update status
+        sheet.getRange(i + 1, colMap.status + 1).setValue(status);
+        
+        return {
+          success: true,
+          data: {
+            id: activityId,
+            newStatus: status,
+            message: 'Activity status updated successfully'
+          }
+        };
+      }
+    }
+    
+    return {
+      success: false,
+      error: 'Activity not found'
+    };
+    
+  } catch (error) {
+    Logger.log('Error in updateActivityStatus: ' + error.message);
+    return {
+      success: false,
+      error: 'Failed to update activity status: ' + error.message
+    };
+  }
+}
+
+/**
+ * Get Students Corner dashboard overview
+ * @param {string} studentEmail - Student's email address
+ * @return {Object} Dashboard data with stats and recent activity
+ */
+function getStudentsCornerDashboard(studentEmail) {
+  try {
+    Logger.log('Getting Students Corner dashboard for: ' + studentEmail);
+    
+    // Get student profile
+    const studentProfile = getStudentProfile(studentEmail);
+    if (!studentProfile.success) {
+      return studentProfile;
+    }
+    
+    const student = studentProfile.data;
+    
+    // Get recent activity (last 10 items)
+    const recentActivity = getStudentsCornerActivity(studentEmail, null, 10);
+    if (!recentActivity.success) {
+      return recentActivity;
+    }
+    
+    // Get leaderboard data
+    const leaderboard = getStudentsCornerLeaderboard(studentEmail);
+    if (!leaderboard.success) {
+      return leaderboard;
+    }
+    
+    // Calculate stats
+    const allActivity = getStudentsCornerActivity(studentEmail);
+    const activities = allActivity.success ? allActivity.data : [];
+    
+    // Calculate total points including engagement points
+    const activityPoints = activities
+      .filter(a => a.studentEmail === studentEmail)
+      .reduce((sum, a) => sum + a.points, 0);
+    const engagementPoints = getStudentEngagementPoints(studentEmail);
+    
+    const stats = {
+      totalActivities: activities.length,
+      myActivities: activities.filter(a => a.studentEmail === studentEmail).length,
+      totalPoints: activityPoints + engagementPoints,
+      weeklyActivities: activities.filter(a => {
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        return new Date(a.timestamp) >= weekAgo;
+      }).length,
+      myRank: leaderboard.data.find(l => l.studentEmail === studentEmail)?.rank || 0,
+      activitiesByType: {
+        POST: activities.filter(a => a.type === 'POST').length,
+        FORUM: activities.filter(a => a.type === 'FORUM').length,
+        EVENT: activities.filter(a => a.type === 'EVENT').length,
+        SKILL_OFFER: activities.filter(a => a.type === 'SKILL_OFFER').length,
+        SKILL_REQUEST: activities.filter(a => a.type === 'SKILL_REQUEST').length
+      }
+    };
+    
+    return {
+      success: true,
+      data: {
+        student: student,
+        stats: stats,
+        recentActivity: recentActivity.data,
+        leaderboard: leaderboard.data.slice(0, 5), // Top 5 for dashboard
+        lastSync: new Date().toISOString()
+      }
+    };
+    
+  } catch (error) {
+    Logger.log('Error in getStudentsCornerDashboard: ' + error.message);
+    return {
+      success: false,
+      error: 'Failed to get Students Corner dashboard: ' + error.message
+    };
+  }
+}
+
+// =====================================================
+// STUDENTS CORNER - ENGAGEMENT FUNCTIONS
+// =====================================================
+
+/**
+ * Helper function to get student info by email
+ */
+function getStudentByEmail(email) {
+  try {
+    const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+    const sheet = spreadsheet.getSheetByName(STUDENT_LOGIN_SHEET);
+    const data = sheet.getDataRange().getValues();
+    
+    if (data.length <= 1) {
+      return { success: false, error: 'No students found' };
+    }
+    
+    // Find student by email
+    const studentRow = data.slice(1).find(row => row[0] === email);
+    
+    if (!studentRow) {
+      return { success: false, error: 'Student not found' };
+    }
+    
+    return {
+      success: true,
+      data: {
+        email: studentRow[0],
+        fullName: studentRow[1],
+        batch: studentRow[2],
+        rollNo: studentRow[3] || ''
+      }
+    };
+    
+  } catch (error) {
+    Logger.log('Error in getStudentByEmail: ' + error.message);
+    return { success: false, error: 'Failed to get student: ' + error.message };
+  }
+}
+
+/**
+ * Create engagement sheet if it doesn't exist
+ */
+function createEngagementSheetIfNeeded() {
+  try {
+    const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+    let sheet = spreadsheet.getSheetByName(STUDENTS_CORNER_ENGAGEMENT_SHEET);
+    
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(STUDENTS_CORNER_ENGAGEMENT_SHEET);
+      
+      // Set up headers
+      const headers = [
+        'ID', 'ActivityID', 'StudentEmail', 'FullName', 'Batch', 
+        'EngagementType', 'CommentText', 'Timestamp', 'Points'
+      ];
+      
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+      sheet.setFrozenRows(1);
+      
+      Logger.log('Created Students Corner - Engagement sheet');
+    }
+    
+    return sheet;
+  } catch (error) {
+    Logger.log('Error creating engagement sheet: ' + error.message);
+    throw error;
+  }
+}
+
+/**
+ * Create a new engagement (like or comment)
+ */
+function createStudentsCornerEngagement(activityId, studentEmail, engagementType, commentText = '') {
+  try {
+    Logger.log(`Creating engagement: activityId=${activityId}, email=${studentEmail}, type=${engagementType}`);
+    
+    // Validate inputs
+    if (!activityId || !studentEmail || !engagementType) {
+      throw new Error('Missing required parameters');
+    }
+    
+    if (!['LIKE', 'COMMENT'].includes(engagementType)) {
+      throw new Error('Invalid engagement type');
+    }
+    
+    // Get student info
+    const student = getStudentByEmail(studentEmail);
+    if (!student.success) {
+      throw new Error('Student not found');
+    }
+    
+    // Check if student is trying to like their own post
+    if (engagementType === 'LIKE') {
+      const activitySheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(STUDENTS_CORNER_SHEET);
+      const activityData = activitySheet.getDataRange().getValues();
+      const activityRow = activityData.find(row => row[0] === activityId);
+      
+      if (activityRow && activityRow[2] === studentEmail) {
+        throw new Error('Cannot like your own post');
+      }
+      
+      // Check if student already liked this post
+      const engagementSheet = createEngagementSheetIfNeeded();
+      const engagementData = engagementSheet.getDataRange().getValues();
+      const existingLike = engagementData.find(row => 
+        row[1] === activityId && row[2] === studentEmail && row[5] === 'LIKE'
+      );
+      
+      if (existingLike) {
+        throw new Error('Already liked this post');
+      }
+    }
+    
+    // Validate comment length
+    if (engagementType === 'COMMENT' && commentText.length > 200) {
+      throw new Error('Comment exceeds 200 character limit');
+    }
+    
+    const engagementSheet = createEngagementSheetIfNeeded();
+    const timestamp = Utilities.formatDate(new Date(), TIMEZONE, "dd/MM/yyyy HH:mm:ss");
+    
+    // Generate unique ID
+    const lastRow = engagementSheet.getLastRow();
+    const newId = lastRow > 1 ? 'ENG' + (lastRow).toString().padStart(4, '0') : 'ENG0001';
+    
+    // Points calculation
+    const points = engagementType === 'LIKE' ? 2 : 3;
+    
+    // Add engagement row
+    const newRowData = [
+      newId,
+      activityId,
+      studentEmail,
+      student.data.fullName,
+      student.data.batch,
+      engagementType,
+      commentText || '',
+      timestamp,
+      points
+    ];
+    
+    engagementSheet.appendRow(newRowData);
+    
+    // Update leaderboard points for the person who engaged
+    updateStudentsCornerPoints(studentEmail, points);
+    
+    // Give points to the post author for receiving engagement
+    const activitySheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(STUDENTS_CORNER_SHEET);
+    const activityData = activitySheet.getDataRange().getValues();
+    const activityRow = activityData.find(row => row[0] === activityId);
+    
+    if (activityRow) {
+      const authorEmail = activityRow[2];
+      const authorPoints = engagementType === 'LIKE' ? 1 : 2;
+      updateStudentsCornerPoints(authorEmail, authorPoints);
+    }
+    
+    Logger.log(`Created engagement: ${newId}`);
+    
+    return {
+      success: true,
+      data: {
+        id: newId,
+        type: engagementType,
+        points: points,
+        message: `${engagementType === 'LIKE' ? 'Liked' : 'Commented on'} successfully! +${points} points`
+      }
+    };
+    
+  } catch (error) {
+    Logger.log('Error in createStudentsCornerEngagement: ' + error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Get engagements for a specific activity
+ */
+function getStudentsCornerEngagements(activityId, currentUserEmail = null) {
+  try {
+    const engagementSheet = createEngagementSheetIfNeeded();
+    const data = engagementSheet.getDataRange().getValues();
+    const headers = data[0];
+    
+    if (data.length <= 1) {
+      return {
+        success: true,
+        data: {
+          likes: 0,
+          comments: [],
+          userLiked: false
+        }
+      };
+    }
+    
+    // Filter engagements for this activity
+    const activityEngagements = data.slice(1).filter(row => row[1] === activityId);
+    
+    const likes = activityEngagements.filter(row => row[5] === 'LIKE');
+    const comments = activityEngagements
+      .filter(row => row[5] === 'COMMENT')
+      .map(row => ({
+        id: row[0],
+        studentEmail: row[2],
+        fullName: row[3],
+        batch: row[4],
+        text: row[6],
+        timestamp: formatDisplayDateTime(row[7])
+      }))
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    // Check if current user liked this activity
+    const userLiked = currentUserEmail ? 
+      likes.some(like => like[2] === currentUserEmail) : false;
+    
+    return {
+      success: true,
+      data: {
+        likes: likes.length,
+        comments: comments,
+        userLiked: userLiked
+      }
+    };
+    
+  } catch (error) {
+    Logger.log('Error in getStudentsCornerEngagements: ' + error.message);
+    return {
+      success: false,
+      error: 'Failed to get engagements: ' + error.message
+    };
+  }
+}
+
+/**
+ * Remove a like (unlike functionality)
+ */
+function removeStudentsCornerEngagement(activityId, studentEmail, engagementType) {
+  try {
+    const engagementSheet = createEngagementSheetIfNeeded();
+    const data = engagementSheet.getDataRange().getValues();
+    
+    // Find the engagement to remove
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (row[1] === activityId && row[2] === studentEmail && row[5] === engagementType) {
+        const points = row[8];
+        engagementSheet.deleteRow(i + 1);
+        
+        // Remove points from the person who engaged
+        updateStudentsCornerPoints(studentEmail, -points);
+        
+        // Remove points from the post author
+        const activitySheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(STUDENTS_CORNER_SHEET);
+        const activityData = activitySheet.getDataRange().getValues();
+        const activityRow = activityData.find(row => row[0] === activityId);
+        
+        if (activityRow) {
+          const authorEmail = activityRow[2];
+          const authorPoints = engagementType === 'LIKE' ? 1 : 2;
+          updateStudentsCornerPoints(authorEmail, -authorPoints);
+        }
+        
+        return {
+          success: true,
+          data: { message: `${engagementType} removed successfully` }
+        };
+      }
+    }
+    
+    return {
+      success: false,
+      error: 'Engagement not found'
+    };
+    
+  } catch (error) {
+    Logger.log('Error in removeStudentsCornerEngagement: ' + error.message);
+    return {
+      success: false,
+      error: 'Failed to remove engagement: ' + error.message
+    };
+  }
+}
+
+/**
+ * Get engagement points for a student
+ */
+function getStudentEngagementPoints(studentEmail) {
+  try {
+    const engagementSheet = createEngagementSheetIfNeeded();
+    const data = engagementSheet.getDataRange().getValues();
+    
+    if (data.length <= 1) {
+      return 0;
+    }
+    
+    let totalPoints = 0;
+    
+    // Sum up all points earned by this student from engagements
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (row[2] === studentEmail) { // StudentEmail column
+        totalPoints += row[8] || 0; // Points column
+      }
+    }
+    
+    return totalPoints;
+  } catch (error) {
+    Logger.log('Error getting student engagement points: ' + error.message);
+    return 0;
+  }
+}
+
+/**
+ * Update points for a student (helper function)
+ * This is now handled automatically through the leaderboard calculation
+ */
+function updateStudentsCornerPoints(studentEmail, pointsToAdd) {
+  try {
+    Logger.log(`Engagement points logged for ${studentEmail}: +${pointsToAdd}`);
+    // Points are now calculated dynamically from engagements
+    // No need to update any sheet as leaderboard will calculate from engagement data
+  } catch (error) {
+    Logger.log('Error logging points: ' + error.message);
+  }
+}
+
+/**
+ * Get all students for @ mention functionality
+ */
+function getStudentsForMentions(studentEmail) {
+  if (!studentEmail) {
+    return createErrorResponse('Invalid or missing student email');
+  }
+  try {
+    const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+    const sheet = spreadsheet.getSheetByName(STUDENT_LOGIN_SHEET);
+    const data = sheet.getDataRange().getValues();
+    
+    if (data.length <= 1) {
+      return { success: true, data: [] };
+    }
+    
+    const students = data.slice(1).map(row => ({
+      email: row[0],
+      fullName: row[1],
+      batch: row[2]
+    })).filter(student => student.email && student.fullName);
+    
+    return {
+      success: true,
+      data: students
+    };
+    
+  } catch (error) {
+    Logger.log('Error in getStudentsForMentions: ' + error.message);
+    return {
+      success: false,
+      error: 'Failed to get students: ' + error.message
     };
   }
 }
