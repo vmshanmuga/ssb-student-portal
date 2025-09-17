@@ -271,6 +271,13 @@ const Resources: React.FC = () => {
   };
 
   const openMaterialModal = (material: ContentItem) => {
+    console.log('Material data:', {
+      fileURL: material.fileURL,
+      attachments: (material as any).attachments,
+      resourceLink: (material as any).resourceLink,
+      driveLink: (material as any).driveLink,
+      fileuploadLink: (material as any).fileuploadLink
+    });
     setSelectedMaterial(material);
     setShowMaterialModal(true);
   };
@@ -754,12 +761,12 @@ const Resources: React.FC = () => {
                   </div>
                 )}
                 
-                {(selectedMaterial as any).attachments && (selectedMaterial as any).attachments.trim() && (
+                {(selectedMaterial as any).attachments && (selectedMaterial as any).attachments.trim() && (selectedMaterial as any).attachments.startsWith('http') && (
                   <div className="p-3 border rounded-lg">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
                         <ExternalLink className="h-4 w-4 text-blue-600" />
-                        <span className="font-medium">File URL</span>
+                        <span className="font-medium">Attachment</span>
                       </div>
                       <Button 
                         size="sm"
@@ -771,7 +778,7 @@ const Resources: React.FC = () => {
                   </div>
                 )}
                 
-                {(selectedMaterial as any).resourceLink && (selectedMaterial as any).resourceLink.trim() && (
+                {(selectedMaterial as any).resourceLink && (selectedMaterial as any).resourceLink.trim() && (selectedMaterial as any).resourceLink.startsWith('http') && (
                   <div className="p-3 border rounded-lg">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
