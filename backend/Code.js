@@ -1944,8 +1944,8 @@ function getCourseResources(studentEmail) {
           editedAt: parseDateTime(getValue(row, indices.editedAt))?.toISOString() || null,
           driveLink: getValue(row, indices.driveLink),
           fileURL: getValue(row, indices.fileURL), // S.File URL field
-          attachments: getValue(row, indices.fileURL) || getValue(row, indices.driveLink), // Use S.File URL first, then driveLink
-          resourceLink: getValue(row, indices.fileURL) || getValue(row, indices.driveLink), // Use S.File URL first, then driveLink  
+          attachments: getValue(row, indices.driveLink), // S.Drive Link field only
+          resourceLink: getValue(row, indices.fileuploadLink), // S.Fileupload Link field only  
           learningObjectives: getValue(row, indices.learningObjectives),
           prerequisites: getValue(row, indices.prerequisites),
           eventType: getValue(row, indices.eventType),
