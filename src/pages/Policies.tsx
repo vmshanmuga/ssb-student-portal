@@ -162,7 +162,7 @@ const PolicyModal = ({ policy, isOpen, onClose }: {
             )}
 
             {/* Files Section */}
-            {(policy.driveLink || policy.fileuploadLink) && (
+            {(policy.fileURL || policy.driveLink || policy.fileuploadLink) && (
               <div className="border rounded-lg p-6">
                 <h4 className="font-semibold text-[#3a3a3a] mb-4 flex items-center">
                   <File className="h-4 w-4 mr-2" />
@@ -170,6 +170,24 @@ const PolicyModal = ({ policy, isOpen, onClose }: {
                 </h4>
                 
                 <div className="space-y-3">
+                  {policy.fileURL && (
+                    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <ExternalLink className="h-5 w-5 text-[#1d8f5b]" />
+                        <span className="font-medium">Document Link</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handleDownload(policy.fileURL!, 'document-link')}
+                        disabled={loading}
+                        className="bg-[#1d8f5b] hover:bg-[#1d8f5b]/90 text-white"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Open Link
+                      </Button>
+                    </div>
+                  )}
+                  
                   {policy.driveLink && (
                     <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                       <div className="flex items-center space-x-3">
@@ -336,6 +354,12 @@ const Policies: React.FC = () => {
   const uniqueTypes = Array.from(new Set(policies.map(p => p.policyType).filter(Boolean)));
 
   const handleCardClick = (policy: ContentItem) => {
+    console.log('Policy data:', {
+      fileURL: policy.fileURL,
+      driveLink: policy.driveLink,
+      fileuploadLink: policy.fileuploadLink,
+      allFields: policy
+    });
     setSelectedPolicy(policy);
     setModalOpen(true);
   };
@@ -385,10 +409,20 @@ const Policies: React.FC = () => {
           {/* Footer */}
           <div className="flex items-center justify-end pt-3 border-t">
             <div className="flex items-center space-x-2">
-              {(policy.driveLink || policy.fileuploadLink) && (
+              {(policy.fileURL || policy.driveLink || policy.fileuploadLink) && (
                 <div className="flex items-center space-x-1 text-sm text-[#1d8f5b]">
-                  <Download className="h-4 w-4" />
-                  <span>Files available</span>
+                  {policy.fileURL && (
+                    <div className="flex items-center space-x-1">
+                      <ExternalLink className="h-4 w-4" />
+                      <span>Link</span>
+                    </div>
+                  )}
+                  {(policy.driveLink || policy.fileuploadLink) && (
+                    <div className="flex items-center space-x-1">
+                      <Download className="h-4 w-4" />
+                      <span>Files</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -452,7 +486,7 @@ const Policies: React.FC = () => {
               <Download className="h-5 w-5 text-blue-600" />
               <div>
                 <p className="text-2xl font-bold text-[#3a3a3a]">
-                  {policies.filter(p => p.driveLink || p.fileuploadLink).length}
+                  {policies.filter(p => p.fileURL || p.driveLink || p.fileuploadLink).length}
                 </p>
                 <p className="text-sm text-muted-foreground">With Files</p>
               </div>

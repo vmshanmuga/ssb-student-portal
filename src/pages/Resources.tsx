@@ -26,7 +26,8 @@ import {
   X,
   Upload,
   Target,
-  BookMarked
+  BookMarked,
+  ArrowUp
 } from 'lucide-react';
 import { apiService, type ContentItem } from '../services/api';
 import { auth } from '../firebase/config';
@@ -254,6 +255,16 @@ const Resources: React.FC = () => {
     return 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
+  const getPriorityColor = (priority: string) => {
+    switch (priority?.toLowerCase()) {
+      case 'low': return 'text-green-600 bg-green-100';
+      case 'medium': return 'text-yellow-600 bg-yellow-100';
+      case 'high': return 'text-red-600 bg-red-100';
+      case 'urgent': return 'text-red-700 bg-red-200';
+      default: return 'text-gray-600 bg-gray-100';
+    }
+  };
+
   const handleDownload = (material: ContentItem) => {
     const fileURL = material.fileURL;
     const attachments = (material as any).attachments;
@@ -272,6 +283,8 @@ const Resources: React.FC = () => {
 
   const openMaterialModal = (material: ContentItem) => {
     console.log('Material data:', {
+      term: material.term,
+      priority: material.priority,
       fileURL: material.fileURL,
       attachments: (material as any).attachments,
       resourceLink: (material as any).resourceLink,
@@ -410,16 +423,26 @@ const Resources: React.FC = () => {
               <div className="p-3 rounded-lg bg-background border">
                 {getTypeIcon(material)}
               </div>
-              <Badge variant="outline" className={getTypeColor(material)}>
-                {material.eventType || 'Material'}
-              </Badge>
+              <div className="flex items-center space-x-2">
+                {material.priority && material.priority.toLowerCase() !== 'none' && (
+                  <ArrowUp className={`h-4 w-4 ${
+                    material.priority.toLowerCase() === 'high' ? 'text-red-500' :
+                    material.priority.toLowerCase() === 'medium' ? 'text-yellow-500' :
+                    material.priority.toLowerCase() === 'low' ? 'text-green-500' :
+                    'text-gray-500'
+                  }`} />
+                )}
+                <Badge variant="outline" className={getTypeColor(material)}>
+                  {material.eventType || 'Material'}
+                </Badge>
+              </div>
             </div>
             
             <CardTitle className="text-lg leading-tight group-hover:text-primary transition-colors">
-              {material.title}
+              {material.subTitle}
             </CardTitle>
             <p className="text-sm text-muted-foreground line-clamp-2">
-              {material.subTitle}
+              {material.title}
             </p>
           </CardHeader>
           
@@ -432,11 +455,6 @@ const Resources: React.FC = () => {
                 </div>
                 <div className="text-xs">
                   {material.term && <span className="mr-2">Term: {material.term}</span>}
-                  {material.priority && (
-                    <Badge variant="outline" className="text-xs">
-                      {material.priority}
-                    </Badge>
-                  )}
                 </div>
               </div>
               
@@ -468,21 +486,24 @@ const Resources: React.FC = () => {
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between mb-2">
-                  <h4 className="text-lg font-medium truncate">{material.title}</h4>
+                  <h4 className="text-lg font-medium truncate">{material.subTitle}</h4>
                   <div className="flex items-center space-x-2">
+                    {material.priority && material.priority.toLowerCase() !== 'none' && (
+                      <ArrowUp className={`h-4 w-4 ${
+                        material.priority.toLowerCase() === 'high' ? 'text-red-500' :
+                        material.priority.toLowerCase() === 'medium' ? 'text-yellow-500' :
+                        material.priority.toLowerCase() === 'low' ? 'text-green-500' :
+                        'text-gray-500'
+                      }`} />
+                    )}
                     <Badge variant="outline" className={getTypeColor(material)}>
                       {material.eventType || 'Material'}
                     </Badge>
-                    {material.priority && (
-                      <Badge variant="outline" className="text-xs">
-                        {material.priority}
-                      </Badge>
-                    )}
                   </div>
                 </div>
                 
                 <p className="text-sm text-muted-foreground mb-3 line-clamp-1">
-                  {material.subTitle}
+                  {material.title}
                 </p>
                 
                 <div className="flex items-center space-x-6 text-sm text-muted-foreground">
@@ -701,19 +722,36 @@ const Resources: React.FC = () => {
       {/* Material Details Modal */}
       {showMaterialModal && selectedMaterial && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-700">
-            <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-700">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{selectedMaterial.title}</h2>
               <Button variant="ghost" size="sm" onClick={closeMaterialModal} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                 <X className="h-4 w-4" />
               </Button>
             </div>
             
-            <div className="p-6 space-y-6 bg-white dark:bg-gray-900">
+            <div className="p-6 space-y-6 bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
               {/* Basic Information */}
               <div className="space-y-3">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">Description</h3>
                 <p className="text-gray-600 dark:text-gray-300">{selectedMaterial.subTitle || 'No description available'}</p>
+                
+                {selectedMaterial.priority && selectedMaterial.priority.toLowerCase() !== 'none' && (
+                  <div className="flex items-center space-x-2 text-sm">
+                    <span className="font-medium text-gray-700 dark:text-gray-300">Priority:</span>
+                    <div className="flex items-center space-x-1">
+                      <ArrowUp className={`h-4 w-4 ${
+                        selectedMaterial.priority.toLowerCase() === 'high' ? 'text-red-500' :
+                        selectedMaterial.priority.toLowerCase() === 'medium' ? 'text-yellow-500' :
+                        selectedMaterial.priority.toLowerCase() === 'low' ? 'text-green-500' :
+                        'text-gray-500'
+                      }`} />
+                      <Badge variant="outline" className={getPriorityColor(selectedMaterial.priority)}>
+                        {selectedMaterial.priority}
+                      </Badge>
+                    </div>
+                  </div>
+                )}
                 
                 {selectedMaterial.term && (
                   <div className="flex items-center space-x-2 text-sm">

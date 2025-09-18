@@ -66,27 +66,42 @@ const Dashboards: React.FC = () => {
 
   const getDashboardIcon = (type: string) => {
     switch (type) {
+      case 'seating': return <MapPin className="w-6 h-6" />;
+      case 'general': return <MapPin className="w-6 h-6" />;
+      case 'attendance': return <Calendar className="w-6 h-6" />;
+      case 'assignment': return <ClipboardList className="w-6 h-6" />;
       case 'academic': return (
         <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 3L1 9L12 15L21 12V17H23V9L12 3ZM5 13.18V17.18L12 21L19 17.18V13.18L12 17L5 13.18Z"/>
         </svg>
       );
-      case 'assignment': return <ClipboardList className="w-6 h-6" />;
-      case 'attendance': return <Calendar className="w-6 h-6" />;
       case 'mentorship': return <Users className="w-6 h-6" />;
       case 'placement': return <TrendingUp className="w-6 h-6" />;
-      case 'seating': return <MapPin className="w-6 h-6" />;
       default: return <LayoutDashboard className="w-6 h-6" />;
     }
   };
 
   const getDashboardColor = (type: string) => {
     switch (type) {
-      case 'academic': return {
+      case 'seating': return {
+        gradient: 'from-purple-50 to-violet-50',
+        border: 'border-purple-200',
+        icon: 'text-purple-700',
+        accent: 'bg-purple-500',
+        iconBg: 'bg-purple-50'
+      };
+      case 'general': return {
+        gradient: 'from-purple-50 to-violet-50',
+        border: 'border-purple-200',
+        icon: 'text-purple-700',
+        accent: 'bg-purple-500',
+        iconBg: 'bg-purple-50'
+      };
+      case 'attendance': return {
         gradient: 'from-emerald-50 to-green-50',
         border: 'border-emerald-200',
         icon: 'text-emerald-700',
-        accent: 'bg-[#1d8f5b]',
+        accent: 'bg-emerald-500',
         iconBg: 'bg-emerald-50'
       };
       case 'assignment': return {
@@ -96,12 +111,12 @@ const Dashboards: React.FC = () => {
         accent: 'bg-[#ffc300]',
         iconBg: 'bg-yellow-50'
       };
-      case 'attendance': return {
-        gradient: 'from-slate-50 to-gray-50',
-        border: 'border-slate-200',
-        icon: 'text-slate-700',
-        accent: 'bg-[#3a3a3a]',
-        iconBg: 'bg-slate-50'
+      case 'academic': return {
+        gradient: 'from-blue-50 to-sky-50',
+        border: 'border-blue-200',
+        icon: 'text-blue-700',
+        accent: 'bg-blue-500',
+        iconBg: 'bg-blue-50'
       };
       case 'mentorship': return {
         gradient: 'from-orange-50 to-orange-100',
@@ -116,13 +131,6 @@ const Dashboards: React.FC = () => {
         icon: 'text-red-700',
         accent: 'bg-red-500',
         iconBg: 'bg-red-50'
-      };
-      case 'seating': return {
-        gradient: 'from-indigo-50 to-blue-50',
-        border: 'border-indigo-200',
-        icon: 'text-indigo-700',
-        accent: 'bg-indigo-500',
-        iconBg: 'bg-indigo-50'
       };
       default: return {
         gradient: 'from-gray-50 to-gray-100',
@@ -203,7 +211,20 @@ const Dashboards: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {dashboards.map((dashboard, index) => {
+          {dashboards
+            .sort((a, b) => {
+              const order = ['seating', 'general', 'attendance', 'assignment', 'academic', 'mentorship', 'placement'];
+              const indexA = order.indexOf(a.type);
+              const indexB = order.indexOf(b.type);
+              
+              // If type not found in order array, put it at the end
+              if (indexA === -1 && indexB === -1) return 0;
+              if (indexA === -1) return 1;
+              if (indexB === -1) return -1;
+              
+              return indexA - indexB;
+            })
+            .map((dashboard, index) => {
             const colors = getDashboardColor(dashboard.type);
             const isRestricted = dashboard.visibility === 'Restricted';
             
@@ -253,11 +274,6 @@ const Dashboards: React.FC = () => {
                         `}>
                           {dashboard.category}
                         </span>
-                        {dashboard.status && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-green-100 text-green-800">
-                            {dashboard.status}
-                          </span>
-                        )}
                         {isRestricted && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-red-100 text-red-800 border border-red-200">
                             🔒 Restricted
@@ -294,7 +310,7 @@ const Dashboards: React.FC = () => {
                       <div className="bg-white/90 backdrop-blur-sm rounded-lg p-3 text-center shadow-lg border border-red-200">
                         <div className="text-red-600 text-2xl mb-1">🔒</div>
                         <p className="text-xs font-medium text-red-800">Access Restricted</p>
-                        <p className="text-xs text-red-600">Contact Administrator</p>
+                        <p className="text-xs text-red-600">Will be granted as required</p>
                       </div>
                     </div>
                   )}

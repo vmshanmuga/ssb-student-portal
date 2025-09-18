@@ -311,7 +311,9 @@ function getStudentDashboard(studentEmail, lastSync) {
         requiresAcknowledgment: getValue(row, indices.requireAcknowledgment) === 'Yes',
         driveLink: getValue(row, indices.driveLink),
         sheetsLink: getValue(row, indices.sheetsLink),
-        hasFiles: !!getValue(row, indices.fileURL),
+        fileuploadLink: getValue(row, indices.fileuploadLink),
+        fileURL: getValue(row, indices.fileURL),
+        hasFiles: !!(getValue(row, indices.driveLink) || getValue(row, indices.sheetsLink) || getValue(row, indices.fileuploadLink) || getValue(row, indices.fileURL)),
         isNew: lastSyncDate && createdAt > lastSyncDate,
         daysUntilDeadline: endDateTime ? Math.ceil((endDateTime - now) / (1000 * 60 * 60 * 24)) : null
       };
@@ -678,6 +680,7 @@ function getContentDetails(contentId, studentEmail) {
           driveLink: getValue(row, indices.driveLink),
           sheetsLink: getValue(row, indices.sheetsLink),
           fileuploadLink: getValue(row, indices.fileuploadLink),
+          fileURL: getValue(row, indices.fileURL),
           files: files,
           daysUntilDeadline: endDateTime ? Math.ceil((endDateTime - new Date()) / (1000 * 60 * 60 * 24)) : null
         };
@@ -1802,6 +1805,7 @@ function getPoliciesAndDocuments(studentEmail) {
           targetBatch: getValue(row, indices.targetBatch),
           priority: getValue(row, indices.priority) || 'Medium',
           status: currentStatus,
+          fileURL: getValue(row, indices.fileURL),
           driveLink: getValue(row, indices.driveLink),
           sheetsLink: getValue(row, indices.sheetsLink),
           fileuploadLink: getValue(row, indices.fileuploadLink),
@@ -1820,7 +1824,8 @@ function getPoliciesAndDocuments(studentEmail) {
         const driveLink = getValue(row, indices.driveLink);
         const sheetsLink = getValue(row, indices.sheetsLink);
         const fileuploadLink = getValue(row, indices.fileuploadLink);
-        policyItem.hasFiles = !!(driveLink || sheetsLink || fileuploadLink);
+        const fileURL = getValue(row, indices.fileURL);
+        policyItem.hasFiles = !!(driveLink || sheetsLink || fileuploadLink || fileURL);
         
         policyItems.push(policyItem);
         Logger.log(`Row ${i}: Added policy/document item - ${policyItem.title}`);
@@ -1939,7 +1944,7 @@ function getCourseResources(studentEmail) {
           term: getValue(row, indices.term) || null,
           domain: getValue(row, indices.domain) || null,
           subject: getValue(row, indices.subject) || null,
-          priority: parseInt(getValue(row, indices.priority)) || 0,
+          priority: getValue(row, indices.priority) || null,
           createdAt: parseDateTime(getValue(row, indices.createdAt))?.toISOString() || null,
           editedAt: parseDateTime(getValue(row, indices.editedAt))?.toISOString() || null,
           driveLink: getValue(row, indices.driveLink),
