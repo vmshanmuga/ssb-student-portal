@@ -5,7 +5,7 @@ import { auth } from './firebase/config';
 import { Toaster } from 'react-hot-toast';
 import Login from './components/Login';
 import DashboardLayout from './components/layout/DashboardLayout';
-import Dashboard from './pages/Dashboard';
+import Overview from './pages/Overview';
 import Dashboards from './pages/Dashboards';
 import Assignments from './pages/Assignments';
 import Announcements from './pages/Announcements';
@@ -69,9 +69,9 @@ function App() {
       />
       <Router>
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to="/overview" replace />} />
           <Route element={<DashboardLayout />}>
-            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="overview" element={<Overview />} />
             <Route path="dashboards" element={<Dashboards />} />
             <Route path="assignments" element={<Assignments />} />
             <Route path="announcements" element={<Announcements />} />

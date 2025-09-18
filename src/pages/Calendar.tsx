@@ -180,7 +180,7 @@ const Calendar: React.FC = () => {
   const handleItemClick = (item: ContentItem) => {
     switch (item.category) {
       case 'CLASS/SESSION SCHEDULE':
-        navigate('/dashboard'); // Classes shown on main dashboard
+        navigate('/overview'); // Classes shown on main overview page
         break;
       case 'ASSIGNMENTS & TASKS':
         navigate('/assignments');
@@ -189,18 +189,34 @@ const Calendar: React.FC = () => {
         navigate('/announcements'); // Combined events and announcements go to announcements section
         break;
       case 'FORMS':
-        navigate('/dashboard'); // Forms might be on dashboard or could be separate
+        navigate('/overview'); // Forms might be on overview or could be separate
         break;
       case 'Resource':
-        navigate('/dashboard'); // Resources on dashboard
+      case 'COURSE MATERIAL':
+        // Navigate directly to the specific resource location if we have the metadata
+        if (item.term && item.domain && item.subject) {
+          const resourcePath = `/resources/${encodeURIComponent(item.term)}/${encodeURIComponent(item.domain)}/${encodeURIComponent(item.subject)}`;
+          navigate(resourcePath);
+        } else {
+          // Fallback to general resources page if metadata is incomplete
+          navigate('/resources');
+        }
         break;
       default:
-        navigate('/dashboard');
+        navigate('/overview');
         break;
     }
     
     // Show a toast to indicate navigation
-    toast.success(`Navigating to ${item.category.toLowerCase().replace(/[&]/g, 'and')} section`);
+    if (item.category === 'Resource' || item.category === 'COURSE MATERIAL') {
+      if (item.term && item.domain && item.subject) {
+        toast.success(`Navigating to ${item.subject} in ${item.domain}`);
+      } else {
+        toast.success('Navigating to resources section');
+      }
+    } else {
+      toast.success(`Navigating to ${item.category.toLowerCase().replace(/[&]/g, 'and')} section`);
+    }
   };
 
   const navigateMonth = (direction: 'prev' | 'next') => {

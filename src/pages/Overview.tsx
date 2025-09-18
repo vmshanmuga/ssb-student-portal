@@ -20,7 +20,7 @@ import { auth } from '../firebase/config';
 import toast from 'react-hot-toast';
 import { formatDateTime, formatDate, parseDate } from '../utils/dateUtils';
 
-const Dashboard: React.FC = () => {
+const Overview: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -390,4 +390,4 @@ const Dashboard: React.FC = () => {
   );
 };
 
-export default Dashboard;
+export default Overview;

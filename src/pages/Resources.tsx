@@ -701,59 +701,60 @@ const Resources: React.FC = () => {
       {/* Material Details Modal */}
       {showMaterialModal && selectedMaterial && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-background border-b p-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold">{selectedMaterial.title}</h2>
-              <Button variant="ghost" size="sm" onClick={closeMaterialModal}>
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-700">
+            <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{selectedMaterial.title}</h2>
+              <Button variant="ghost" size="sm" onClick={closeMaterialModal} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                 <X className="h-4 w-4" />
               </Button>
             </div>
             
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 bg-white dark:bg-gray-900">
               {/* Basic Information */}
               <div className="space-y-3">
-                <h3 className="text-lg font-medium">Description</h3>
-                <p className="text-muted-foreground">{selectedMaterial.subTitle || 'No description available'}</p>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Description</h3>
+                <p className="text-gray-600 dark:text-gray-300">{selectedMaterial.subTitle || 'No description available'}</p>
                 
                 {selectedMaterial.term && (
                   <div className="flex items-center space-x-2 text-sm">
-                    <span className="font-medium">Term:</span>
-                    <Badge variant="outline">{selectedMaterial.term}</Badge>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">Term:</span>
+                    <Badge variant="outline" className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600">{selectedMaterial.term}</Badge>
                   </div>
                 )}
                 
                 {selectedMaterial.domain && (
                   <div className="flex items-center space-x-2 text-sm">
-                    <span className="font-medium">Domain:</span>
-                    <Badge variant="outline">{selectedMaterial.domain}</Badge>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">Domain:</span>
+                    <Badge variant="outline" className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600">{selectedMaterial.domain}</Badge>
                   </div>
                 )}
                 
                 {selectedMaterial.subject && (
                   <div className="flex items-center space-x-2 text-sm">
-                    <span className="font-medium">Subject:</span>
-                    <Badge variant="outline">{selectedMaterial.subject}</Badge>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">Subject:</span>
+                    <Badge variant="outline" className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600">{selectedMaterial.subject}</Badge>
                   </div>
                 )}
               </div>
 
               {/* File Links Section */}
               <div className="space-y-3">
-                <h3 className="text-lg font-medium flex items-center">
-                  <ExternalLink className="h-5 w-5 mr-2" />
+                <h3 className="text-lg font-medium flex items-center text-gray-900 dark:text-white">
+                  <ExternalLink className="h-5 w-5 mr-2 text-gray-600 dark:text-gray-400" />
                   Access Links
                 </h3>
                 
                 {selectedMaterial.fileURL && selectedMaterial.fileURL.trim() && (
-                  <div className="p-3 border rounded-lg">
+                  <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <ExternalLink className="h-4 w-4 text-blue-600" />
-                        <span className="font-medium">File Link</span>
+                        <ExternalLink className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <span className="font-medium text-gray-900 dark:text-white">File Link</span>
                       </div>
                       <Button 
                         size="sm"
                         onClick={() => window.open(selectedMaterial.fileURL!, '_blank')}
+                        className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-500 dark:hover:bg-blue-600"
                       >
                         Open File
                       </Button>
@@ -762,15 +763,16 @@ const Resources: React.FC = () => {
                 )}
                 
                 {(selectedMaterial as any).attachments && (selectedMaterial as any).attachments.trim() && (selectedMaterial as any).attachments.startsWith('http') && (
-                  <div className="p-3 border rounded-lg">
+                  <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <ExternalLink className="h-4 w-4 text-blue-600" />
-                        <span className="font-medium">Attachment</span>
+                        <ExternalLink className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <span className="font-medium text-gray-900 dark:text-white">Attachment</span>
                       </div>
                       <Button 
                         size="sm"
                         onClick={() => window.open((selectedMaterial as any).attachments, '_blank')}
+                        className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-500 dark:hover:bg-blue-600"
                       >
                         Open File
                       </Button>
@@ -779,15 +781,16 @@ const Resources: React.FC = () => {
                 )}
                 
                 {(selectedMaterial as any).resourceLink && (selectedMaterial as any).resourceLink.trim() && (selectedMaterial as any).resourceLink.startsWith('http') && (
-                  <div className="p-3 border rounded-lg">
+                  <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <Upload className="h-4 w-4 text-green-600" />
-                        <span className="font-medium">File Upload Link</span>
+                        <Upload className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        <span className="font-medium text-gray-900 dark:text-white">File Upload Link</span>
                       </div>
                       <Button 
                         size="sm"
                         onClick={() => window.open((selectedMaterial as any).resourceLink, '_blank')}
+                        className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600"
                       >
                         Open Link
                       </Button>
@@ -796,26 +799,26 @@ const Resources: React.FC = () => {
                 )}
                 
                 {!selectedMaterial.fileURL?.trim() && !(selectedMaterial as any).attachments?.trim() && !(selectedMaterial as any).resourceLink?.trim() && (
-                  <p className="text-muted-foreground text-sm italic">No access links available</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm italic">No access links available</p>
                 )}
               </div>
 
               {/* Learning Content Section */}
               {((selectedMaterial as any).learningObjectives || (selectedMaterial as any).prerequisites) && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-medium flex items-center">
-                    <BookMarked className="h-5 w-5 mr-2" />
+                  <h3 className="text-lg font-medium flex items-center text-gray-900 dark:text-white">
+                    <BookMarked className="h-5 w-5 mr-2 text-gray-600 dark:text-gray-400" />
                     Learning Content
                   </h3>
                   
                   {(selectedMaterial as any).learningObjectives && (selectedMaterial as any).learningObjectives.trim() && (
                     <div className="space-y-2">
-                      <h4 className="text-md font-medium flex items-center text-blue-700">
+                      <h4 className="text-md font-medium flex items-center text-blue-700 dark:text-blue-400">
                         <Target className="h-4 w-4 mr-2" />
                         Learning Objectives
                       </h4>
                       <div 
-                        className="prose prose-sm max-w-none p-4 border rounded-lg bg-blue-50/50"
+                        className="prose prose-sm max-w-none p-4 border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50/50 dark:bg-blue-900/20 text-gray-900 dark:text-gray-100"
                         dangerouslySetInnerHTML={{ __html: (selectedMaterial as any).learningObjectives }}
                       />
                     </div>
@@ -823,12 +826,12 @@ const Resources: React.FC = () => {
                   
                   {(selectedMaterial as any).prerequisites && (selectedMaterial as any).prerequisites.trim() && (
                     <div className="space-y-2">
-                      <h4 className="text-md font-medium flex items-center text-orange-700">
+                      <h4 className="text-md font-medium flex items-center text-orange-700 dark:text-orange-400">
                         <BookMarked className="h-4 w-4 mr-2" />
                         Prerequisites
                       </h4>
                       <div 
-                        className="prose prose-sm max-w-none p-4 border rounded-lg bg-orange-50/50"
+                        className="prose prose-sm max-w-none p-4 border border-orange-200 dark:border-orange-800 rounded-lg bg-orange-50/50 dark:bg-orange-900/20 text-gray-900 dark:text-gray-100"
                         dangerouslySetInnerHTML={{ __html: (selectedMaterial as any).prerequisites }}
                       />
                     </div>
@@ -837,8 +840,12 @@ const Resources: React.FC = () => {
               )}
               
               {/* Action Buttons */}
-              <div className="flex justify-end pt-4 border-t">
-                <Button variant="outline" onClick={closeMaterialModal}>
+              <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+                <Button 
+                  variant="outline" 
+                  onClick={closeMaterialModal}
+                  className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
                   Close
                 </Button>
               </div>

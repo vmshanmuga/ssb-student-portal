@@ -11,7 +11,8 @@ import {
   Calendar,
   AlertCircle,
   CheckCircle,
-  X
+  X,
+  MapPin
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -74,6 +75,7 @@ const Dashboards: React.FC = () => {
       case 'attendance': return <Calendar className="w-6 h-6" />;
       case 'mentorship': return <Users className="w-6 h-6" />;
       case 'placement': return <TrendingUp className="w-6 h-6" />;
+      case 'seating': return <MapPin className="w-6 h-6" />;
       default: return <LayoutDashboard className="w-6 h-6" />;
     }
   };
@@ -114,6 +116,13 @@ const Dashboards: React.FC = () => {
         icon: 'text-red-700',
         accent: 'bg-red-500',
         iconBg: 'bg-red-50'
+      };
+      case 'seating': return {
+        gradient: 'from-indigo-50 to-blue-50',
+        border: 'border-indigo-200',
+        icon: 'text-indigo-700',
+        accent: 'bg-indigo-500',
+        iconBg: 'bg-indigo-50'
       };
       default: return {
         gradient: 'from-gray-50 to-gray-100',
