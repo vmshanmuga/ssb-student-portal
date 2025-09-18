@@ -3,17 +3,17 @@
   "name": "Scaler School of Business - Student's Portal",
   "icons": [
     {
-      "src": "https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/090/510/original/Copy_of_Logo.png?1727164226",
+      "src": "favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/png"
+      "type": "image/x-icon"
     },
     {
-      "src": "https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/090/510/original/Copy_of_Logo.png?1727164226",
+      "src": "logo192.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "https://d2beiqkhq929f0.cloudfront.net/public_assets/assets/000/090/510/original/Copy_of_Logo.png?1727164226",
+      "src": "logo512.png",
       "type": "image/png",
       "sizes": "512x512"
     }
