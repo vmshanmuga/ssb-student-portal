@@ -302,7 +302,13 @@ const Overview: React.FC = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2 mb-1">
-                    <p className="text-sm font-medium">{item.title}</p>
+                    <p className="text-sm font-medium">
+                      {item.category === 'EVENTS' 
+                        ? (item.eventTitle || item.eventType)
+                        : item.category === 'POLICY & DOCUMENTS'
+                        ? (item.policyName || item.title)
+                        : item.title}
+                    </p>
                     {item.status === 'Active' ? (
                       <Badge variant="outline" className="bg-green-500 text-white border-0 animate-pulse text-xs">
                         LIVE NOW
@@ -366,7 +372,13 @@ const Overview: React.FC = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2 mb-1">
-                    <h4 className="text-sm font-medium truncate">{item.title}</h4>
+                    <h4 className="text-sm font-medium truncate">
+                      {item.category === 'EVENTS' 
+                        ? (item.eventTitle || item.eventType)
+                        : item.category === 'POLICY & DOCUMENTS'
+                        ? (item.policyName || item.title)
+                        : item.title}
+                    </h4>
                     <Badge variant="outline" className={getStatusColor(item.status)}>
                       {item.status}
                     </Badge>
