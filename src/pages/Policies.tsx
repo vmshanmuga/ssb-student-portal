@@ -65,11 +65,11 @@ const PolicyModal = ({ policy, isOpen, onClose }: {
   const getPolicyTypeBadgeColor = (type: string) => {
     switch (type?.toLowerCase()) {
       case 'policy':
-        return 'bg-[#1d8f5b] text-white border-[#1d8f5b]';
+        return 'bg-green-600 text-white border-green-600 dark:bg-green-500 dark:border-green-500';
       case 'document':
-        return 'bg-[#ffc300] text-[#3a3a3a] border-[#ffc300]';
+        return 'bg-yellow-500 text-black border-yellow-500 dark:bg-yellow-400 dark:text-black dark:border-yellow-400';
       default:
-        return 'bg-[#3a3a3a] text-white border-[#3a3a3a]';
+        return 'bg-gray-600 text-white border-gray-600 dark:bg-gray-500 dark:border-gray-500';
     }
   };
 
@@ -105,11 +105,11 @@ const PolicyModal = ({ policy, isOpen, onClose }: {
       />
       
       {/* Modal */}
-      <div className="relative bg-background rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+      <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-700">
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b">
+        <div className="flex items-start justify-between p-6 border-b bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <div className="flex-1 pr-4">
-            <h2 className="text-2xl font-bold text-[#3a3a3a] mb-3">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
               {policy.policyName || policy.title}
             </h2>
             
@@ -126,36 +126,70 @@ const PolicyModal = ({ policy, isOpen, onClose }: {
             </div>
           </div>
           
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-muted rounded-full transition-colors"
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onClose} 
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           >
-            <X className="h-5 w-5" />
-          </button>
+            <X className="h-4 w-4" />
+          </Button>
         </div>
 
         {/* Content */}
         <div className="overflow-y-auto max-h-[calc(90vh-200px)]">
-          <div className="p-6 space-y-6">
+          <div className="p-6 space-y-6 bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
             {/* Metadata */}
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+            <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
               <Calendar className="h-4 w-4" />
               <span>Published: {formatPublishedDate(policy.startDateTime)}</span>
             </div>
 
             {/* HTML Content */}
             {policy.policyContent && (
-              <div className="border rounded-lg p-6 bg-muted/20">
+              <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-6 bg-gray-50 dark:bg-gray-700">
+                <style>{`
+                  .policy-content * {
+                    color: rgb(17 24 39) !important;
+                  }
+                  .dark .policy-content * {
+                    color: rgb(255 255 255) !important;
+                  }
+                  .policy-content p {
+                    color: rgb(17 24 39) !important;
+                  }
+                  .dark .policy-content p {
+                    color: rgb(255 255 255) !important;
+                  }
+                  .policy-content strong {
+                    color: rgb(17 24 39) !important;
+                  }
+                  .dark .policy-content strong {
+                    color: rgb(255 255 255) !important;
+                  }
+                `}</style>
                 <div 
-                  className="prose prose-sm max-w-none
-                    prose-headings:text-[#3a3a3a]
-                    prose-p:text-[#3a3a3a]
-                    prose-strong:text-[#3a3a3a]
-                    prose-ul:text-[#3a3a3a]
-                    prose-ol:text-[#3a3a3a]
-                    prose-li:text-[#3a3a3a]
+                  className="policy-content prose prose-sm max-w-none text-gray-900 dark:text-white
+                    prose-headings:text-gray-900 dark:prose-headings:text-white
+                    prose-p:text-gray-900 dark:prose-p:text-white
+                    prose-strong:text-gray-900 dark:prose-strong:text-white
+                    prose-ul:text-gray-900 dark:prose-ul:text-white
+                    prose-ol:text-gray-900 dark:prose-ol:text-white
+                    prose-li:text-gray-900 dark:prose-li:text-white
                     prose-a:text-[#1d8f5b]
-                    prose-a:hover:text-[#1d8f5b]/80"
+                    prose-a:hover:text-[#1d8f5b]/80
+                    [&_*]:!text-gray-900 dark:[&_*]:!text-white
+                    [&_p]:!text-gray-900 dark:[&_p]:!text-white
+                    [&_h1]:!text-gray-900 dark:[&_h1]:!text-white
+                    [&_h2]:!text-gray-900 dark:[&_h2]:!text-white
+                    [&_h3]:!text-gray-900 dark:[&_h3]:!text-white
+                    [&_h4]:!text-gray-900 dark:[&_h4]:!text-white
+                    [&_h5]:!text-gray-900 dark:[&_h5]:!text-white
+                    [&_h6]:!text-gray-900 dark:[&_h6]:!text-white
+                    [&_strong]:!text-gray-900 dark:[&_strong]:!text-white
+                    [&_ul]:!text-gray-900 dark:[&_ul]:!text-white
+                    [&_ol]:!text-gray-900 dark:[&_ol]:!text-white
+                    [&_li]:!text-gray-900 dark:[&_li]:!text-white"
                   dangerouslySetInnerHTML={{ __html: policy.policyContent }}
                 />
               </div>
@@ -163,18 +197,18 @@ const PolicyModal = ({ policy, isOpen, onClose }: {
 
             {/* Files Section */}
             {(policy.fileURL || policy.driveLink || policy.fileuploadLink) && (
-              <div className="border rounded-lg p-6">
-                <h4 className="font-semibold text-[#3a3a3a] mb-4 flex items-center">
+              <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-6 bg-gray-50 dark:bg-gray-700">
+                <h4 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                   <File className="h-4 w-4 mr-2" />
                   Available Files
                 </h4>
                 
                 <div className="space-y-3">
                   {policy.fileURL && (
-                    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-600 rounded-lg border border-gray-200 dark:border-gray-500">
                       <div className="flex items-center space-x-3">
                         <ExternalLink className="h-5 w-5 text-[#1d8f5b]" />
-                        <span className="font-medium">Document Link</span>
+                        <span className="font-medium text-gray-900 dark:text-white">Document Link</span>
                       </div>
                       <Button
                         size="sm"
@@ -241,8 +275,12 @@ const PolicyModal = ({ policy, isOpen, onClose }: {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end p-6 border-t bg-muted/20">
-          <Button onClick={onClose} variant="outline">
+        <div className="flex justify-end p-6 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <Button 
+            onClick={onClose} 
+            variant="outline"
+            className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
             Close
           </Button>
         </div>
@@ -343,11 +381,11 @@ const Policies: React.FC = () => {
   const getPolicyTypeBadgeColor = (type: string) => {
     switch (type?.toLowerCase()) {
       case 'policy':
-        return 'bg-[#1d8f5b] text-white border-[#1d8f5b]';
+        return 'bg-green-600 text-white border-green-600 dark:bg-green-500 dark:border-green-500';
       case 'document':
-        return 'bg-[#ffc300] text-[#3a3a3a] border-[#ffc300]';
+        return 'bg-yellow-500 text-black border-yellow-500 dark:bg-yellow-400 dark:text-black dark:border-yellow-400';
       default:
-        return 'bg-[#3a3a3a] text-white border-[#3a3a3a]';
+        return 'bg-gray-600 text-white border-gray-600 dark:bg-gray-500 dark:border-gray-500';
     }
   };
 
@@ -372,7 +410,7 @@ const Policies: React.FC = () => {
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <CardTitle className="text-lg font-bold text-[#3a3a3a] mb-3">
+            <CardTitle className="text-lg font-bold text-foreground mb-3">
               {policy.policyName || policy.title}
             </CardTitle>
             
@@ -445,7 +483,7 @@ const Policies: React.FC = () => {
             <div className="flex items-center space-x-2">
               <FileText className="h-5 w-5 text-[#1d8f5b]" />
               <div>
-                <p className="text-2xl font-bold text-[#3a3a3a]">{policies.length}</p>
+                <p className="text-2xl font-bold text-foreground">{policies.length}</p>
                 <p className="text-sm text-muted-foreground">Total</p>
               </div>
             </div>
@@ -457,7 +495,7 @@ const Policies: React.FC = () => {
             <div className="flex items-center space-x-2">
               <CheckCircle className="h-5 w-5 text-green-600" />
               <div>
-                <p className="text-2xl font-bold text-[#3a3a3a]">
+                <p className="text-2xl font-bold text-foreground">
                   {policies.filter(p => p.policyType?.toLowerCase() === 'policy').length}
                 </p>
                 <p className="text-sm text-muted-foreground">Policies</p>
@@ -471,7 +509,7 @@ const Policies: React.FC = () => {
             <div className="flex items-center space-x-2">
               <File className="h-5 w-5 text-[#ffc300]" />
               <div>
-                <p className="text-2xl font-bold text-[#3a3a3a]">
+                <p className="text-2xl font-bold text-foreground">
                   {policies.filter(p => p.policyType?.toLowerCase() === 'document').length}
                 </p>
                 <p className="text-sm text-muted-foreground">Documents</p>
@@ -485,7 +523,7 @@ const Policies: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Download className="h-5 w-5 text-blue-600" />
               <div>
-                <p className="text-2xl font-bold text-[#3a3a3a]">
+                <p className="text-2xl font-bold text-foreground">
                   {policies.filter(p => p.fileURL || p.driveLink || p.fileuploadLink).length}
                 </p>
                 <p className="text-sm text-muted-foreground">With Files</p>

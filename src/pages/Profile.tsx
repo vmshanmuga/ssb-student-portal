@@ -6,7 +6,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Label } from '../components/ui/label';
-import { Separator } from '../components/ui/separator';
 import { ProfileSkeleton } from '../components/ui/loading-skeletons';
 import { 
   User, 
@@ -28,7 +27,6 @@ import {
   Target,
   BookOpen,
   Globe,
-  Camera,
   Check,
   AlertCircle
 } from 'lucide-react';
@@ -44,7 +42,6 @@ const Profile: React.FC = () => {
   const [editForm, setEditForm] = useState<FullStudentProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const user = auth.currentUser;
 
   useEffect(() => {
@@ -121,96 +118,6 @@ const Profile: React.FC = () => {
     }) : null);
   };
 
-  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !user?.email) return;
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select a valid image file');
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size should be less than 5MB');
-      return;
-    }
-
-    try {
-      setUploadingPhoto(true);
-      
-      // Compress image to reduce size
-      const compressedFile = await compressImage(file);
-      
-      // Upload to backend
-      const result = await apiService.uploadProfilePicture(user.email, compressedFile);
-      
-      if (result.success && result.data) {
-        // Update profile with new photo URL
-        const updatedProfile = {
-          ...profile!,
-          profilePicture: result.data.profilePictureUrl
-        };
-        
-        setProfile(updatedProfile);
-        setEditForm(updatedProfile);
-        toast.success('Profile picture updated successfully!');
-      } else {
-        toast.error('Failed to upload photo: ' + (result.error || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Error uploading photo:', error);
-      toast.error('Failed to upload photo');
-    } finally {
-      setUploadingPhoto(false);
-    }
-  };
-
-  const compressImage = (file: File): Promise<File> => {
-    return new Promise((resolve) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d')!;
-      const img = new Image();
-      
-      img.onload = () => {
-        // Calculate new dimensions (max 800x800)
-        const maxSize = 800;
-        let { width, height } = img;
-        
-        if (width > height) {
-          if (width > maxSize) {
-            height = (height * maxSize) / width;
-            width = maxSize;
-          }
-        } else {
-          if (height > maxSize) {
-            width = (width * maxSize) / height;
-            height = maxSize;
-          }
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        
-        // Draw and compress
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const compressedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: Date.now(),
-            });
-            resolve(compressedFile);
-          } else {
-            resolve(file);
-          }
-        }, 'image/jpeg', 0.8); // 80% quality
-      };
-      
-      img.src = URL.createObjectURL(file);
-    });
-  };
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -322,32 +229,6 @@ const Profile: React.FC = () => {
                   {getInitials(profile.fullName)}
                 </AvatarFallback>
               </Avatar>
-              {isEditing && (
-                <div className="space-y-2">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="w-full" 
-                    disabled={uploadingPhoto}
-                    onClick={() => document.getElementById('photo-upload')?.click()}
-                  >
-                    <Camera className="h-4 w-4 mr-2" />
-                    {uploadingPhoto ? 'Uploading...' : 'Change Photo'}
-                  </Button>
-                  <input
-                    id="photo-upload"
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoUpload}
-                    className="hidden"
-                  />
-                  {uploadingPhoto && (
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div className="bg-primary h-2 rounded-full animate-pulse w-1/2"></div>
-                    </div>
-                  )}
-                </div>
-              )}
               
               {/* Profile Completion Badge */}
               <div className="flex items-center space-x-2 px-3 py-1 bg-muted rounded-full">
@@ -371,18 +252,8 @@ const Profile: React.FC = () => {
                 </h3>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="fullName" className="text-sm font-medium">Full Name</Label>
-                    {isEditing ? (
-                      <Input
-                        id="fullName"
-                        type="text"
-                        value={editForm?.fullName || ''}
-                        onChange={(e) => handleInputChange('fullName', e.target.value)}
-                        placeholder="Enter your full name"
-                      />
-                    ) : (
-                      <p className="text-lg font-semibold">{profile.fullName || 'Not provided'}</p>
-                    )}
+                    <Label className="text-sm font-medium">Full Name</Label>
+                    <p className="text-lg font-semibold">{profile.fullName || 'Not provided'}</p>
                   </div>
                   
                   <div className="space-y-2">
@@ -395,30 +266,12 @@ const Profile: React.FC = () => {
                   
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Roll Number</Label>
-                    {isEditing ? (
-                      <Input
-                        type="text"
-                        value={editForm?.rollNo || ''}
-                        onChange={(e) => handleInputChange('rollNo', e.target.value)}
-                        placeholder="Enter roll number"
-                      />
-                    ) : (
-                      <p>{profile.rollNo || 'Not assigned'}</p>
-                    )}
+                    <p>{profile.rollNo || 'Not assigned'}</p>
                   </div>
                   
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Batch</Label>
-                    {isEditing ? (
-                      <Input
-                        type="text"
-                        value={editForm?.batch || ''}
-                        onChange={(e) => handleInputChange('batch', e.target.value)}
-                        placeholder="e.g., SSB 2024"
-                      />
-                    ) : (
-                      <p>{profile.batch || 'Not assigned'}</p>
-                    )}
+                    <p>{profile.batch || 'Not assigned'}</p>
                   </div>
                   
                   <div className="space-y-2">

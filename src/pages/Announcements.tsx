@@ -212,7 +212,7 @@ const Announcements: React.FC = () => {
             <div className="flex-1">
               <div className="flex items-center space-x-2 mb-2">
                 {getCategoryIcon(announcement.category)}
-                <CardTitle className="text-lg">{announcement.title}</CardTitle>
+                <CardTitle className="text-lg">{announcement.eventTitle || announcement.eventType}</CardTitle>
                 
                 {/* Status Badge */}
                 <Badge 
@@ -400,12 +400,12 @@ const Announcements: React.FC = () => {
       {/* Detailed Modal */}
       {showModal && selectedItem && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-background border-b p-4 flex items-center justify-between">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-700">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 {getCategoryIcon(selectedItem.category)}
                 <div>
-                  <h2 className="text-xl font-semibold">{selectedItem.title}</h2>
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{selectedItem.eventTitle || selectedItem.eventType}</h2>
                   <div className="flex items-center space-x-2 mt-1">
                     <Badge variant="outline" className={getCategoryColor(selectedItem.category)}>
                       {selectedItem.category}
@@ -419,17 +419,17 @@ const Announcements: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <Button variant="ghost" size="sm" onClick={closeModal}>
+              <Button variant="ghost" size="sm" onClick={closeModal} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                 <X className="h-4 w-4" />
               </Button>
             </div>
             
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
               {/* Basic Information */}
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-lg font-medium mb-2">Description</h3>
-                  <p className="text-muted-foreground leading-relaxed">
+                  <h3 className="text-lg font-medium mb-2 text-gray-900 dark:text-white">Description</h3>
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
                     {selectedItem.subTitle || selectedItem.content || 'No description available'}
                   </p>
                 </div>
@@ -437,22 +437,22 @@ const Announcements: React.FC = () => {
                 {/* Metadata */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <div className="flex items-center space-x-2 text-sm">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                      <Clock className="h-4 w-4" />
                       <span className="font-medium">Created:</span>
                       <span>{formatDateTime(selectedItem.createdAt)}</span>
                     </div>
                     
                     {selectedItem.postedBy && (
-                      <div className="flex items-center space-x-2 text-sm">
-                        <Users className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                        <Users className="h-4 w-4" />
                         <span className="font-medium">Posted by:</span>
                         <span>{selectedItem.postedBy}</span>
                       </div>
                     )}
                     
-                    <div className="flex items-center space-x-2 text-sm">
-                      <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                      <AlertCircle className="h-4 w-4" />
                       <span className="font-medium">Priority:</span>
                       <Badge variant="outline" className={getPriorityColor(selectedItem.priority)}>
                         {selectedItem.priority}
@@ -462,16 +462,16 @@ const Announcements: React.FC = () => {
 
                   <div className="space-y-2">
                     {selectedItem.targetBatch && (
-                      <div className="flex items-center space-x-2 text-sm">
-                        <Users className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                        <Users className="h-4 w-4" />
                         <span className="font-medium">Target Batch:</span>
                         <span>{selectedItem.targetBatch}</span>
                       </div>
                     )}
                     
                     {selectedItem.eventType && (
-                      <div className="flex items-center space-x-2 text-sm">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                        <FileText className="h-4 w-4" />
                         <span className="font-medium">Event Type:</span>
                         <span>{selectedItem.eventType}</span>
                       </div>
@@ -482,8 +482,8 @@ const Announcements: React.FC = () => {
 
               {/* Event Specific Details */}
               {selectedItem.category === 'EVENTS' && (
-                <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                  <div className="flex items-center space-x-2 text-purple-700 mb-4">
+                <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
+                  <div className="flex items-center space-x-2 text-purple-700 dark:text-purple-300 mb-4">
                     <Calendar className="h-5 w-5" />
                     <h3 className="text-lg font-medium">Event Details</h3>
                   </div>
@@ -491,39 +491,39 @@ const Announcements: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     {selectedItem.startDateTime && (
                       <div className="space-y-1">
-                        <span className="font-medium text-purple-700">Start Time:</span>
-                        <p className="text-purple-600">{formatDateTime(selectedItem.startDateTime)}</p>
+                        <span className="font-medium text-purple-700 dark:text-purple-300">Start Time:</span>
+                        <p className="text-purple-600 dark:text-purple-200">{formatDateTime(selectedItem.startDateTime)}</p>
                       </div>
                     )}
                     
                     {selectedItem.endDateTime && (
                       <div className="space-y-1">
-                        <span className="font-medium text-purple-700">End Time:</span>
-                        <p className="text-purple-600">{formatDateTime(selectedItem.endDateTime)}</p>
+                        <span className="font-medium text-purple-700 dark:text-purple-300">End Time:</span>
+                        <p className="text-purple-600 dark:text-purple-200">{formatDateTime(selectedItem.endDateTime)}</p>
                       </div>
                     )}
                     
                     {selectedItem.eventLocation && (
                       <div className="space-y-1">
-                        <span className="font-medium text-purple-700 flex items-center">
+                        <span className="font-medium text-purple-700 dark:text-purple-300 flex items-center">
                           <MapPin className="h-4 w-4 mr-1" />
                           Location:
                         </span>
-                        <p className="text-purple-600">{selectedItem.eventLocation}</p>
+                        <p className="text-purple-600 dark:text-purple-200">{selectedItem.eventLocation}</p>
                       </div>
                     )}
 
                     {selectedItem.eventAgenda && (
                       <div className="space-y-1 md:col-span-2">
-                        <span className="font-medium text-purple-700">Agenda:</span>
-                        <p className="text-purple-600">{selectedItem.eventAgenda}</p>
+                        <span className="font-medium text-purple-700 dark:text-purple-300">Agenda:</span>
+                        <p className="text-purple-600 dark:text-purple-200">{selectedItem.eventAgenda}</p>
                       </div>
                     )}
                     
                     {selectedItem.speakerInfo && (
                       <div className="space-y-1 md:col-span-2">
-                        <span className="font-medium text-purple-700">Speaker Info:</span>
-                        <p className="text-purple-600">{selectedItem.speakerInfo}</p>
+                        <span className="font-medium text-purple-700 dark:text-purple-300">Speaker Info:</span>
+                        <p className="text-purple-600 dark:text-purple-200">{selectedItem.speakerInfo}</p>
                       </div>
                     )}
                   </div>
@@ -533,17 +533,17 @@ const Announcements: React.FC = () => {
               {/* Files and Links */}
               {(selectedItem.fileURL || selectedItem.driveLink || selectedItem.sheetsLink || selectedItem.fileuploadLink) && (
                 <div className="space-y-3">
-                  <h3 className="text-lg font-medium flex items-center">
+                  <h3 className="text-lg font-medium flex items-center text-gray-900 dark:text-white">
                     <ExternalLink className="h-5 w-5 mr-2" />
                     Related Links & Files
                   </h3>
                   
                   <div className="space-y-2">
                     {selectedItem.fileURL && (
-                      <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
                         <div className="flex items-center space-x-2">
                           <FileText className="h-4 w-4 text-blue-600" />
-                          <span className="font-medium">File Link</span>
+                          <span className="font-medium text-gray-900 dark:text-white">File Link</span>
                         </div>
                         <Button 
                           size="sm"
@@ -555,10 +555,10 @@ const Announcements: React.FC = () => {
                     )}
                     
                     {selectedItem.driveLink && (
-                      <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
                         <div className="flex items-center space-x-2">
                           <ExternalLink className="h-4 w-4 text-green-600" />
-                          <span className="font-medium">Google Drive</span>
+                          <span className="font-medium text-gray-900 dark:text-white">Google Drive</span>
                         </div>
                         <Button 
                           size="sm"
@@ -570,10 +570,10 @@ const Announcements: React.FC = () => {
                     )}
                     
                     {selectedItem.sheetsLink && (
-                      <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
                         <div className="flex items-center space-x-2">
                           <FileText className="h-4 w-4 text-orange-600" />
-                          <span className="font-medium">Google Sheets</span>
+                          <span className="font-medium text-gray-900 dark:text-white">Google Sheets</span>
                         </div>
                         <Button 
                           size="sm"
@@ -591,16 +591,16 @@ const Announcements: React.FC = () => {
               {selectedItem.category === 'ANNOUNCEMENTS' && (
                 <>
                   {selectedItem.messageDetails && (
-                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <h3 className="text-lg font-medium text-blue-700 mb-2">Message Details</h3>
-                      <p className="text-blue-600 text-sm leading-relaxed">{selectedItem.messageDetails}</p>
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
+                      <h3 className="text-lg font-medium text-blue-700 dark:text-blue-300 mb-2">Message Details</h3>
+                      <p className="text-blue-600 dark:text-blue-200 text-sm leading-relaxed">{selectedItem.messageDetails}</p>
                     </div>
                   )}
                   
                   {selectedItem.callToAction && (
-                    <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                      <h3 className="text-lg font-medium text-orange-700 mb-2">Call to Action</h3>
-                      <p className="text-orange-600 text-sm leading-relaxed">{selectedItem.callToAction}</p>
+                    <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-700">
+                      <h3 className="text-lg font-medium text-orange-700 dark:text-orange-300 mb-2">Call to Action</h3>
+                      <p className="text-orange-600 dark:text-orange-200 text-sm leading-relaxed">{selectedItem.callToAction}</p>
                     </div>
                   )}
                 </>
@@ -608,13 +608,13 @@ const Announcements: React.FC = () => {
 
               {/* Acknowledgment Section */}
               {selectedItem.requiresAcknowledgment && (
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <AlertCircle className="h-5 w-5 text-blue-600" />
                       <div>
-                        <h3 className="text-lg font-medium text-blue-700">Acknowledgment Required</h3>
-                        <p className="text-blue-600 text-sm">Please acknowledge that you have read and understood this {selectedItem.category.toLowerCase()}.</p>
+                        <h3 className="text-lg font-medium text-blue-700 dark:text-blue-300">Acknowledgment Required</h3>
+                        <p className="text-blue-600 dark:text-blue-200 text-sm">Please acknowledge that you have read and understood this {selectedItem.category.toLowerCase()}.</p>
                       </div>
                     </div>
                     
@@ -646,8 +646,12 @@ const Announcements: React.FC = () => {
               )}
 
               {/* Action Buttons */}
-              <div className="flex justify-end pt-4 border-t">
-                <Button variant="outline" onClick={closeModal}>
+              <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+                <Button 
+                  variant="outline" 
+                  onClick={closeModal}
+                  className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
                   Close
                 </Button>
               </div>

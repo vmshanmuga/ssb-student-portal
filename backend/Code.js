@@ -341,6 +341,7 @@ function getStudentDashboard(studentEmail, lastSync) {
           break;
           
         case 'ANNOUNCEMENTS':
+          contentItem.eventTitle = getValue(row, indices.eventTitle);
           contentItem.messageDetails = getValue(row, indices.messageDetails);
           contentItem.callToAction = getValue(row, indices.callToAction);
           contentItem.readTracking = getValue(row, indices.readTracking);
@@ -698,6 +699,7 @@ function getContentDetails(contentId, studentEmail) {
             break;
             
           case 'ANNOUNCEMENTS':
+            contentDetails.eventTitle = getValue(row, indices.eventTitle);
             contentDetails.messageDetails = getValue(row, indices.messageDetails);
             contentDetails.callToAction = getValue(row, indices.callToAction);
             contentDetails.readTracking = getValue(row, indices.readTracking);
