@@ -58,17 +58,23 @@ const Profile: React.FC = () => {
       const result = await apiService.getFullStudentProfile(user.email);
       
       if (result.success && result.data) {
-        console.log('Full profile data received:', result.data);
-        console.log('Profile picture URL:', result.data.profilePicture);
+        console.log('Profile page: Full profile data received:', result.data);
+        console.log('Profile page: Profile picture URL:', result.data.profilePicture);
         setProfile(result.data);
         setEditForm(result.data);
       } else {
-        console.error('Failed to load profile:', result.error);
+        console.error('❌ API returned error:', result.error);
+        console.error('📄 Full API response:', result);
         toast.error('Failed to load profile: ' + (result.error || 'Unknown error'));
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
-      toast.error('Failed to load profile');
+      console.error('💥 Catch block - Network/Parse error:', error);
+      console.error('🔧 Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      });
+      toast.error('Network error - check your connection');
     } finally {
       setLoading(false);
     }
@@ -207,12 +213,23 @@ const Profile: React.FC = () => {
                       return;
                     }
                     
-                    // Only attempt Google Drive conversion if URL contains 'drive.google.com'
-                    if (currentSrc && currentSrc.includes('drive.google.com') && currentSrc.includes('=w400-h400')) {
-                      // Extract file ID from Google Drive URL
-                      const fileIdMatch = currentSrc.match(/\/d\/([a-zA-Z0-9_-]+)/);
-                      if (fileIdMatch?.[1]) {
-                        const newUrl = `https://drive.google.com/uc?export=view&id=${fileIdMatch[1]}`;
+                    // Handle both old and new Google Drive URL formats
+                    if (currentSrc && (currentSrc.includes('googleusercontent.com') || currentSrc.includes('drive.google.com'))) {
+                      let fileId = '';
+                      
+                      // Extract file ID from different Google Drive URL formats
+                      if (currentSrc.includes('googleusercontent.com')) {
+                        // Format: https://lh3.googleusercontent.com/d/FILE_ID=w400-h400
+                        const match = currentSrc.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                        fileId = match?.[1] || '';
+                      } else if (currentSrc.includes('drive.google.com')) {
+                        // Format: https://drive.google.com/file/d/FILE_ID/view
+                        const match = currentSrc.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                        fileId = match?.[1] || '';
+                      }
+                      
+                      if (fileId) {
+                        const newUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
                         console.log('Converting Google Drive URL to direct format:', newUrl);
                         target.dataset.retried = 'true';
                         target.src = newUrl;
@@ -220,7 +237,7 @@ const Profile: React.FC = () => {
                       }
                     }
                     
-                    // For all other URLs (ImgBB, direct public links, etc.) or failed conversions
+                    // For all other URLs or failed conversions
                     console.log('Unable to load image, showing fallback avatar');
                     target.removeAttribute('src');
                   }}

@@ -15,6 +15,7 @@ import { apiService, type DashboardData, type ContentItem } from '../services/ap
 import { auth } from '../firebase/config';
 import toast from 'react-hot-toast';
 import { formatDate, parseDate } from '../utils/dateUtils';
+import AssignmentDetailModal from '../components/assignment/AssignmentDetailModal';
 
 const Assignments: React.FC = () => {
   const [assignments, setAssignments] = useState<ContentItem[]>([]);
@@ -23,6 +24,8 @@ const Assignments: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'endDateTime' | 'priority' | 'status'>('endDateTime');
+  const [selectedAssignment, setSelectedAssignment] = useState<ContentItem | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const user = auth.currentUser;
 
   useEffect(() => {
@@ -107,10 +110,23 @@ const Assignments: React.FC = () => {
     }
   };
 
+  const handleCardClick = (assignment: ContentItem) => {
+    setSelectedAssignment(assignment);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedAssignment(null);
+  };
+
   const AssignmentCard = ({ assignment }: { assignment: ContentItem }) => {
     
     return (
-      <Card className="hover:shadow-md transition-shadow cursor-pointer">
+      <Card 
+        className="hover:shadow-md transition-shadow cursor-pointer"
+        onClick={() => handleCardClick(assignment)}
+      >
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -180,17 +196,32 @@ const Assignments: React.FC = () => {
 
             {/* Actions */}
             <div className="flex space-x-2 pt-2 border-t">
-              <Button size="sm" className="flex-1">
+              <Button 
+                size="sm" 
+                className="flex-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCardClick(assignment);
+                }}
+              >
                 <FileText className="h-4 w-4 mr-2" />
                 View Details
               </Button>
               {assignment.hasFiles && (
-                <Button size="sm" variant="outline">
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   Files
                 </Button>
               )}
               {assignment.requiresAcknowledgment && (
-                <Button size="sm" variant="outline">
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   Acknowledge
                 </Button>
               )}
@@ -341,6 +372,15 @@ const Assignments: React.FC = () => {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Assignment Detail Modal */}
+      {selectedAssignment && (
+        <AssignmentDetailModal
+          assignment={selectedAssignment}
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+        />
       )}
     </div>
   );

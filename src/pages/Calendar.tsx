@@ -167,12 +167,12 @@ const Calendar: React.FC = () => {
 
   const getCategoryBgColor = (category: string) => {
     switch (category) {
-      case 'CLASS/SESSION SCHEDULE': return 'bg-[#1d8f5b]/10';
-      case 'ASSIGNMENTS & TASKS': return 'bg-[#ffc300]/20';
-      case 'Events & Announcements': return 'bg-purple-100';
-      case 'FORMS': return 'bg-indigo-100';
-      case 'Resource': return 'bg-green-100';
-      default: return 'bg-gray-100';
+      case 'CLASS/SESSION SCHEDULE': return 'bg-green-100 dark:bg-green-900/20';
+      case 'ASSIGNMENTS & TASKS': return 'bg-yellow-100 dark:bg-yellow-900/20';
+      case 'Events & Announcements': return 'bg-purple-100 dark:bg-purple-900/20';
+      case 'FORMS': return 'bg-indigo-100 dark:bg-indigo-900/20';
+      case 'Resource': return 'bg-green-100 dark:bg-green-900/20';
+      default: return 'bg-gray-100 dark:bg-gray-800';
     }
   };
 
@@ -255,19 +255,19 @@ const Calendar: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Active': return 'bg-green-100 text-green-800 border-green-200';
-      case 'Upcoming': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'Expired': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'Active': return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-700';
+      case 'Upcoming': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-700';
+      case 'Expired': return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600';
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'High': return 'bg-red-100 text-red-800 border-red-200';
-      case 'Medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'Low': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'High': return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-700';
+      case 'Medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-700';
+      case 'Low': return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-700';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600';
     }
   };
 
@@ -345,7 +345,7 @@ const Calendar: React.FC = () => {
             <div className="flex items-center space-x-2">
               <CalendarIcon className="h-5 w-5 text-[#1d8f5b]" />
               <div>
-                <p className="text-2xl font-bold text-[#3a3a3a]">{stats.total}</p>
+                <p className="text-2xl font-bold text-foreground">{stats.total}</p>
                 <p className="text-sm text-muted-foreground">Total Items</p>
               </div>
             </div>
@@ -357,7 +357,7 @@ const Calendar: React.FC = () => {
             <div className="flex items-center space-x-2">
               <ClipboardList className="h-5 w-5 text-[#ffc300]" />
               <div>
-                <p className="text-2xl font-bold text-[#3a3a3a]">{stats.assignments}</p>
+                <p className="text-2xl font-bold text-foreground">{stats.assignments}</p>
                 <p className="text-sm text-muted-foreground">Assignments</p>
               </div>
             </div>
@@ -369,7 +369,7 @@ const Calendar: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Bell className="h-5 w-5 text-purple-600" />
               <div>
-                <p className="text-2xl font-bold text-[#3a3a3a]">{stats.eventsAnnouncements}</p>
+                <p className="text-2xl font-bold text-foreground">{stats.eventsAnnouncements}</p>
                 <p className="text-sm text-muted-foreground">Events & Announcements</p>
               </div>
             </div>
@@ -381,7 +381,7 @@ const Calendar: React.FC = () => {
             <div className="flex items-center space-x-2">
               <GraduationCap className="h-5 w-5 text-[#1d8f5b]" />
               <div>
-                <p className="text-2xl font-bold text-[#3a3a3a]">{stats.classes}</p>
+                <p className="text-2xl font-bold text-foreground">{stats.classes}</p>
                 <p className="text-sm text-muted-foreground">Classes</p>
               </div>
             </div>
@@ -624,7 +624,7 @@ const Calendar: React.FC = () => {
               </CardHeader>
               <CardContent>
                 {selectedDateEvents.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className={`space-y-3 ${selectedDateEvents.length > 2 ? 'max-h-64 overflow-y-auto pr-2' : ''}`}>
                     {selectedDateEvents.map(event => {
                       const dateTime = formatDateTime(event.startDateTime || '');
                       const endDateTime = formatDateTime(event.endDateTime || '');
@@ -635,7 +635,7 @@ const Calendar: React.FC = () => {
                           className="p-3 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
                         >
                           <div className="flex items-start justify-between mb-2">
-                            <h4 className="font-medium text-[#3a3a3a]">{event.title}</h4>
+                            <h4 className="font-medium text-foreground">{event.title}</h4>
                             <div className="flex space-x-1">
                               <Badge variant="outline" className={getStatusColor(event.status || 'Upcoming')}>
                                 {event.status}
@@ -664,7 +664,7 @@ const Calendar: React.FC = () => {
                                 <span>{dateTime.time} - {endDateTime.time}</span>
                               </div>
                               {event.domain && (
-                                <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded">
                                   {event.domain}
                                 </span>
                               )}
@@ -679,6 +679,11 @@ const Calendar: React.FC = () => {
                         </div>
                       );
                     })}
+                    {selectedDateEvents.length > 2 && (
+                      <div className="text-xs text-muted-foreground text-center py-2 border-t">
+                        Showing {selectedDateEvents.length} events - scroll to see all
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-muted-foreground text-center py-4">
@@ -714,7 +719,7 @@ const Calendar: React.FC = () => {
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate text-[#3a3a3a]">{event.title}</p>
+                        <p className="text-sm font-medium truncate text-foreground">{event.title}</p>
                         {event.subTitle && (
                           <p className="text-xs text-[#1d8f5b] font-medium">{event.subTitle}</p>
                         )}
@@ -726,7 +731,7 @@ const Calendar: React.FC = () => {
                             {event.status}
                           </Badge>
                           {event.domain && (
-                            <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                            <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600">
                               {event.domain}
                             </Badge>
                           )}
