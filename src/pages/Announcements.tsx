@@ -23,6 +23,8 @@ import { apiService, type DashboardData, type ContentItem, type ContentItemWithA
 import { auth } from '../firebase/config';
 import toast from 'react-hot-toast';
 import { formatDate, formatDateTime, parseDate } from '../utils/dateUtils';
+import { SSBCalendarEvent } from '../types';
+import { api as zoomApiService } from '../zoom/services/api';
 
 const Announcements: React.FC = () => {
   const [announcements, setAnnouncements] = useState<ContentItemWithAck[]>([]);
@@ -39,28 +41,182 @@ const Announcements: React.FC = () => {
     fetchAnnouncements();
   }, []);
 
+  // Helper to generate unique ID from event fields
+  const generateUniqueEventId = (event: SSBCalendarEvent): string => {
+    const fields = [
+      event.batch || '',
+      event.eventType || '',
+      event.eventName || '',
+      event.startDate || '',
+      event.startTime || '',
+      event.eventId || ''
+    ];
+
+    // Take last 4 chars of each field and combine
+    const uniqueParts = fields
+      .map(field => field.toString().slice(-4).replace(/[^a-zA-Z0-9]/g, ''))
+      .filter(part => part.length > 0)
+      .join('-');
+
+    return `ssb-cal-${uniqueParts}`;
+  };
+
+  // Helper function to convert SSBCalendarEvent to ContentItemWithAck
+  const convertSSBEventToContentItem = (event: SSBCalendarEvent): ContentItemWithAck | null => {
+    // Parse date from DD-MMM-YYYY format and time to create DateTime objects
+    const parseEventDateTime = (dateStr: string, timeStr: string): Date | null => {
+      try {
+        if (!dateStr || !timeStr) return null;
+
+        const dateParts = dateStr.split('-');
+        const monthMap: { [key: string]: number } = {
+          'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+          'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+        };
+
+        if (dateParts.length !== 3) return null;
+
+        const day = parseInt(dateParts[0]);
+        const month = monthMap[dateParts[1]];
+        const year = parseInt(dateParts[2]);
+
+        if (isNaN(day) || month === undefined || isNaN(year)) return null;
+
+        // Parse time (format: "2:00 PM" or "14:00")
+        const timeMatch = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+        if (!timeMatch) return null;
+
+        let hours = parseInt(timeMatch[1]);
+        const minutes = parseInt(timeMatch[2]);
+        const period = timeMatch[3]?.toUpperCase();
+
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
+
+        const dateObj = new Date(year, month, day, hours, minutes);
+        if (isNaN(dateObj.getTime())) return null;
+
+        return dateObj;
+      } catch (error) {
+        return null;
+      }
+    };
+
+    const startDate = parseEventDateTime(event.startDate, event.startTime);
+    const endDate = parseEventDateTime(event.endDate, event.endTime);
+
+    // Skip events with invalid dates
+    if (!startDate || !endDate) return null;
+
+    // Determine status based on dates
+    const now = new Date();
+    let status = 'Upcoming';
+    if (now >= startDate && now <= endDate) {
+      status = 'Active';
+    } else if (now > endDate) {
+      status = 'Expired';
+    }
+
+    // Determine category based on event type
+    const getCategoryFromEventType = (eventType: string): string => {
+      const type = eventType.toLowerCase();
+      if (type.includes('session')) return 'SSB SESSION';
+      if (type.includes('assessment') || type.includes('quiz')) return 'SSB ASSESSMENT';
+      if (type.includes('event')) return 'SSB EVENT';
+      if (type.includes('others') || type.includes('other')) return 'SSB OTHERS';
+      return 'EVENTS'; // Default to standard EVENTS category
+    };
+
+    return {
+      id: generateUniqueEventId(event), // Generate unique ID from multiple fields
+      title: event.eventName,
+      subTitle: event.description || `${event.startTime} - ${event.endTime}`,
+      content: event.description || '',
+      category: getCategoryFromEventType(event.eventType),
+      eventType: event.eventType,
+      eventTitle: event.eventName,
+      status,
+      priority: 'Medium',
+      targetBatch: event.batch,
+      startDateTime: startDate.toISOString(),
+      endDateTime: endDate.toISOString(),
+      createdAt: event.updatedAt || new Date().toISOString(),
+      requiresAcknowledgment: false,
+      hasFiles: false,
+      isNew: event.updated === 'Yes',
+      daysUntilDeadline: null,
+      isAcknowledged: false,
+      eventLocation: undefined,
+      eventAgenda: undefined,
+      speakerInfo: undefined,
+      driveLink: event.link || undefined,
+    };
+  };
+
   const fetchAnnouncements = async () => {
     try {
       setLoading(true);
-      
+
       if (!user?.email) {
         toast.error('No user email found');
         return;
       }
 
-      const result = await apiService.getStudentDashboard(user.email);
-      
-      if (!result.success) {
-        toast.error(`Error: ${result.error || 'Unknown error'}`);
+      // Get student batch for filtering
+      let studentBatch: string | undefined;
+      try {
+        const studentResult = await zoomApiService.getStudent(user.email);
+        if (studentResult.success && studentResult.data?.student) {
+          studentBatch = studentResult.data.student.batch;
+          console.log('Announcements: Student batch:', studentBatch);
+        }
+      } catch (err) {
+        console.warn('Announcements: Could not fetch student batch:', err);
+      }
+
+      // Fetch dashboard data and SSB calendar events in parallel
+      const [dashboardResult, calendarResult] = await Promise.all([
+        apiService.getStudentDashboard(user.email),
+        zoomApiService.getCalendarEvents(studentBatch)
+      ]);
+
+      if (!dashboardResult.success) {
+        toast.error(`Error: ${dashboardResult.error || 'Unknown error'}`);
         return;
       }
 
-      // Filter for both announcements and events
-      const announcementItems = result.data!.content.filter(item => 
+      let allItems: ContentItemWithAck[] = [];
+
+      // Filter for both announcements and events from dashboard
+      const announcementItems = dashboardResult.data!.content.filter(item =>
         item.category === 'ANNOUNCEMENTS' || item.category === 'EVENTS'
       ) as ContentItemWithAck[];
-      
-      setAnnouncements(announcementItems);
+
+      allItems = [...announcementItems];
+
+      // Add SSB calendar events where eventType contains "Event"
+      if (calendarResult.success && calendarResult.data?.events) {
+        console.log('Announcements: SSB calendar events found:', calendarResult.data.events.length);
+
+        // Filter events where eventType contains "Event"
+        const eventTypeEvents = calendarResult.data.events.filter(event =>
+          event.eventType && event.eventType.toLowerCase().includes('event')
+        );
+
+        console.log('Announcements: Events with "Event" type:', eventTypeEvents.length);
+
+        const ssbEventItems = eventTypeEvents
+          .map(convertSSBEventToContentItem)
+          .filter((item): item is ContentItemWithAck => item !== null);
+
+        allItems = [...allItems, ...ssbEventItems];
+        console.log('Announcements: Valid SSB events after filtering:', ssbEventItems.length);
+      } else {
+        console.log('Announcements: No SSB calendar events found or error:', calendarResult.error);
+      }
+
+      setAnnouncements(allItems);
+      console.log('Announcements: Total items (dashboard + SSB events):', allItems.length);
       
     } catch (error) {
       console.error('Error fetching announcements:', error);
@@ -140,6 +296,10 @@ const Announcements: React.FC = () => {
     switch(category) {
       case 'ANNOUNCEMENTS': return <Megaphone className="h-4 w-4 text-blue-600" />;
       case 'EVENTS': return <Calendar className="h-4 w-4 text-purple-600" />;
+      case 'SSB EVENT': return <Calendar className="h-4 w-4 text-purple-600" />;
+      case 'SSB SESSION': return <Calendar className="h-4 w-4 text-blue-600" />;
+      case 'SSB ASSESSMENT': return <FileText className="h-4 w-4 text-orange-600" />;
+      case 'SSB OTHERS': return <Bell className="h-4 w-4 text-gray-600" />;
       default: return <Bell className="h-4 w-4 text-gray-600" />;
     }
   };
@@ -148,6 +308,10 @@ const Announcements: React.FC = () => {
     switch(category) {
       case 'ANNOUNCEMENTS': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'EVENTS': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'SSB EVENT': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'SSB SESSION': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'SSB ASSESSMENT': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'SSB OTHERS': return 'bg-gray-100 text-gray-800 border-gray-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
@@ -361,6 +525,10 @@ const Announcements: React.FC = () => {
                 <option value="all">All Categories</option>
                 <option value="ANNOUNCEMENTS">Announcements</option>
                 <option value="EVENTS">Events</option>
+                <option value="SSB EVENT">SSB Events</option>
+                <option value="SSB SESSION">SSB Sessions</option>
+                <option value="SSB ASSESSMENT">SSB Assessments</option>
+                <option value="SSB OTHERS">SSB Others</option>
               </select>
               
               <select

@@ -322,11 +322,11 @@ const Policies: React.FC = () => {
         );
         
         setPolicies(policyItems);
-        
+
+        // Removed unnecessary success toast - data loading doesn't need user notification
+        // Only show toast if there's an actual issue (no policies found)
         if (policyItems.length === 0) {
           toast('No policies or documents found for your batch');
-        } else {
-          toast.success(`Loaded ${policyItems.length} policies and documents`);
         }
         
       } catch (error) {

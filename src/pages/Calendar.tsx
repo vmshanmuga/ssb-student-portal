@@ -7,9 +7,9 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { CalendarSkeleton } from '../components/ui/loading-skeletons';
-import { 
-  Calendar as CalendarIcon, 
-  ChevronLeft, 
+import {
+  Calendar as CalendarIcon,
+  ChevronLeft,
   ChevronRight,
   Clock,
   GraduationCap,
@@ -18,11 +18,14 @@ import {
   Filter,
   ClipboardList,
   Bell,
-  FileText
+  FileText,
+  Video
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ContentItem } from '../services/api';
 import { formatDate, formatDateTime as formatDateTimeUtil, formatTime, parseDate } from '../utils/dateUtils';
+import { Session, SSBCalendarEvent } from '../types';
+import { api as zoomApiService } from '../zoom/services/api';
 
 const Calendar: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -41,41 +44,285 @@ const Calendar: React.FC = () => {
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
 
+  // Helper function to convert Session to ContentItem
+  const convertSessionToContentItem = (session: Session): ContentItem | null => {
+    // Parse date from DD-MMM-YYYY format and time to create DateTime objects
+    const parseSessionDateTime = (dateStr: string, timeStr: string): { start: Date; end: Date } | null => {
+      try {
+        if (!dateStr || !timeStr) {
+          console.warn('Missing date or time for session:', session.sessionId);
+          return null;
+        }
+
+        const dateParts = dateStr.split('-');
+        const monthMap: { [key: string]: number } = {
+          'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+          'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+        };
+
+        if (dateParts.length !== 3) {
+          console.warn('Invalid date format for session:', session.sessionId, dateStr);
+          return null;
+        }
+
+        const day = parseInt(dateParts[0]);
+        const month = monthMap[dateParts[1]];
+        const year = parseInt(dateParts[2]);
+
+        if (isNaN(day) || month === undefined || isNaN(year)) {
+          console.warn('Invalid date values for session:', session.sessionId, { day, month, year });
+          return null;
+        }
+
+        // Parse time (format: "2:00 PM" or "14:00")
+        const timeMatch = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+        if (!timeMatch) {
+          console.warn('Invalid time format for session:', session.sessionId, timeStr);
+          return null;
+        }
+
+        let hours = parseInt(timeMatch[1]);
+        const minutes = parseInt(timeMatch[2]);
+        const period = timeMatch[3]?.toUpperCase();
+
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
+
+        const startDate = new Date(year, month, day, hours, minutes);
+
+        // Validate the date is valid
+        if (isNaN(startDate.getTime())) {
+          console.warn('Invalid date object for session:', session.sessionId, { year, month, day, hours, minutes });
+          return null;
+        }
+
+        // Calculate end time by adding duration
+        const durationMinutes = typeof session.duration === 'string' ? parseInt(session.duration) : session.duration;
+        const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
+
+        return { start: startDate, end: endDate };
+      } catch (error) {
+        console.error('Error parsing session date/time:', error, session);
+        return null;
+      }
+    };
+
+    const dateTimes = parseSessionDateTime(session.date || '', session.startTime || '');
+
+    // Skip sessions with invalid dates
+    if (!dateTimes) {
+      console.warn('Skipping session with invalid date/time:', session.sessionId, session.sessionName);
+      return null;
+    }
+
+    const startDateTime = dateTimes.start.toISOString();
+    const endDateTime = dateTimes.end.toISOString();
+
+    return {
+      id: session.sessionId,
+      title: session.subject || session.topic || 'Class Session',
+      subTitle: session.sessionName || session.topic,
+      content: `${session.startTime || ''} • Duration: ${session.duration} min`,
+      category: 'SESSIONS',
+      eventType: 'SESSION',
+      status: session.status || 'scheduled',
+      priority: 'Medium',
+      subject: session.subject,
+      domain: session.domain,
+      targetBatch: session.batch,
+      term: session.term,
+      startDateTime,
+      endDateTime,
+      createdAt: new Date().toISOString(),
+      requiresAcknowledgment: false,
+      hasFiles: false,
+      isNew: false,
+      daysUntilDeadline: null
+    };
+  };
+
+  // Helper to generate unique ID from event fields
+  const generateUniqueEventId = (event: SSBCalendarEvent): string => {
+    const fields = [
+      event.batch || '',
+      event.eventType || '',
+      event.eventName || '',
+      event.startDate || '',
+      event.startTime || '',
+      event.eventId || ''
+    ];
+
+    // Take last 4 chars of each field and combine
+    const uniqueParts = fields
+      .map(field => field.toString().slice(-4).replace(/[^a-zA-Z0-9]/g, ''))
+      .filter(part => part.length > 0)
+      .join('-');
+
+    return `ssb-cal-${uniqueParts}`;
+  };
+
+  // Helper function to convert SSBCalendarEvent to ContentItem
+  const convertCalendarEventToContentItem = (event: SSBCalendarEvent): ContentItem | null => {
+    // Parse date from DD-MMM-YYYY format and time to create DateTime objects
+    const parseEventDateTime = (dateStr: string, timeStr: string): Date | null => {
+      try {
+        if (!dateStr || !timeStr) {
+          console.warn('Missing date or time for event:', event.eventId);
+          return null;
+        }
+
+        const dateParts = dateStr.split('-');
+        const monthMap: { [key: string]: number } = {
+          'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+          'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+        };
+
+        if (dateParts.length !== 3) {
+          console.warn('Invalid date format for event:', event.eventId, dateStr);
+          return null;
+        }
+
+        const day = parseInt(dateParts[0]);
+        const month = monthMap[dateParts[1]];
+        const year = parseInt(dateParts[2]);
+
+        if (isNaN(day) || month === undefined || isNaN(year)) {
+          console.warn('Invalid date values for event:', event.eventId, { day, month, year });
+          return null;
+        }
+
+        // Parse time (format: "2:00 PM" or "14:00")
+        const timeMatch = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+        if (!timeMatch) {
+          console.warn('Invalid time format for event:', event.eventId, timeStr);
+          return null;
+        }
+
+        let hours = parseInt(timeMatch[1]);
+        const minutes = parseInt(timeMatch[2]);
+        const period = timeMatch[3]?.toUpperCase();
+
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
+
+        const dateObj = new Date(year, month, day, hours, minutes);
+
+        // Validate the date is valid
+        if (isNaN(dateObj.getTime())) {
+          console.warn('Invalid date object for event:', event.eventId, { year, month, day, hours, minutes });
+          return null;
+        }
+
+        return dateObj;
+      } catch (error) {
+        console.error('Error parsing event date/time:', error, event);
+        return null;
+      }
+    };
+
+    const startDate = parseEventDateTime(event.startDate, event.startTime);
+    const endDate = parseEventDateTime(event.endDate, event.endTime);
+
+    // Skip events with invalid dates
+    if (!startDate || !endDate) {
+      console.warn('Skipping event with invalid date/time:', event.eventId, event.eventName);
+      return null;
+    }
+
+    const startDateTime = startDate.toISOString();
+    const endDateTime = endDate.toISOString();
+
+    // Determine category based on event type
+    const getCategoryFromEventType = (eventType: string): string => {
+      const type = eventType.toLowerCase();
+      if (type.includes('session')) return 'SSB SESSION';
+      if (type.includes('assessment') || type.includes('quiz')) return 'SSB ASSESSMENT';
+      if (type.includes('event')) return 'SSB EVENT';
+      if (type.includes('others') || type.includes('other')) return 'SSB OTHERS';
+      return 'SSB EVENT'; // Default to event
+    };
+
+    return {
+      id: generateUniqueEventId(event), // Generate unique ID from multiple fields
+      title: event.eventName,
+      subTitle: event.eventType || '',
+      content: event.description || `${event.startTime} - ${event.endTime}`,
+      category: getCategoryFromEventType(event.eventType),
+      eventType: event.eventType || 'EVENT',
+      status: 'scheduled',
+      priority: 'Medium',
+      subject: event.eventType,
+      domain: undefined,
+      targetBatch: event.batch,
+      term: undefined,
+      startDateTime,
+      endDateTime,
+      createdAt: new Date().toISOString(),
+      requiresAcknowledgment: false,
+      hasFiles: false,
+      isNew: event.updated === 'Yes', // Mark as "new" if updated
+      daysUntilDeadline: null
+    };
+  };
+
   // Fetch schedule data
   useEffect(() => {
     const fetchSchedule = async () => {
       if (!user?.email) return;
-      
+
       try {
         setLoading(true);
         console.log('Fetching schedule for user:', user.email);
-        // Try getStudentSchedule first, fall back to dashboard if no data
-        let result = await apiService.getStudentSchedule(user.email);
-        
-        // If no schedule data, get from dashboard and filter for EVENTS and ANNOUNCEMENTS
-        if (!result.success || !result.data || result.data.length === 0) {
-          console.log('Calendar: No schedule data, trying dashboard API...');
-          const dashboardResult = await apiService.getStudentDashboard(user.email);
-          if (dashboardResult.success) {
-            const eventItems = dashboardResult.data!.content.filter(item => 
-              item.category === 'EVENTS' || item.category === 'ANNOUNCEMENTS'
-            );
-            result = { success: true, data: eventItems };
+
+        // Get student batch for filtering
+        let studentBatch: string | undefined;
+        try {
+          const studentResult = await zoomApiService.getStudent(user.email);
+          if (studentResult.success && studentResult.data?.student) {
+            studentBatch = studentResult.data.student.batch;
+            console.log('Calendar: Student batch:', studentBatch);
           }
+        } catch (err) {
+          console.warn('Calendar: Could not fetch student batch, showing all events:', err);
         }
-        
-        console.log('Schedule API response:', result);
-        
-        if (result.success) {
-          console.log('Schedule items found:', result.data?.length || 0);
-          console.log('Calendar: All schedule items:', result.data);
-          console.log('Calendar: Available categories:', Array.from(new Set((result.data || []).map(item => item.category))));
-          setScheduleItems(result.data || []);
-          setFilteredItems(result.data || []);
+
+        // Fetch Zoom sessions and SSB calendar events in parallel
+        const [zoomResult, calendarResult] = await Promise.all([
+          zoomApiService.getSessions(),
+          zoomApiService.getCalendarEvents(studentBatch)
+        ]);
+
+        let allItems: ContentItem[] = [];
+
+        // Add Zoom Live sessions
+        if (zoomResult.success && zoomResult.data?.sessions) {
+          console.log('Calendar: Zoom sessions found:', zoomResult.data.sessions.length);
+          const sessionItems = zoomResult.data.sessions
+            .map(convertSessionToContentItem)
+            .filter((item): item is ContentItem => item !== null);
+          allItems = [...allItems, ...sessionItems];
+          console.log('Calendar: Valid sessions after filtering:', sessionItems.length);
         } else {
-          console.error('Failed to fetch schedule:', result.error);
-          toast.error('Failed to load schedule: ' + (result.error || 'Unknown error'));
+          console.log('Calendar: No Zoom sessions found or error:', zoomResult.error);
         }
+
+        // Add SSB calendar events
+        if (calendarResult.success && calendarResult.data?.events) {
+          console.log('Calendar: SSB calendar events found:', calendarResult.data.events.length);
+          const calendarItems = calendarResult.data.events
+            .map(convertCalendarEventToContentItem)
+            .filter((item): item is ContentItem => item !== null);
+          allItems = [...allItems, ...calendarItems];
+          console.log('Calendar: Valid calendar events after filtering:', calendarItems.length);
+        } else {
+          console.log('Calendar: No SSB calendar events found or error:', calendarResult.error);
+        }
+
+        console.log('Calendar: Total items (sessions + events):', allItems.length);
+        console.log('Calendar: Available categories:', Array.from(new Set(allItems.map(item => item.category))));
+
+        setScheduleItems(allItems);
+        setFilteredItems(allItems);
       } catch (error) {
         console.error('Error fetching schedule:', error);
         toast.error('Error loading schedule');
@@ -145,9 +392,16 @@ const Calendar: React.FC = () => {
   // Get category-specific styling
   const getCategoryIcon = (category: string) => {
     switch (category) {
+      case 'SESSIONS': return <Video className="h-5 w-5" />;
+      case 'SSB EVENT': return <CalendarIcon className="h-5 w-5" />;
+      case 'SSB SESSION': return <Video className="h-5 w-5" />;
+      case 'SSB ASSESSMENT': return <ClipboardList className="h-5 w-5" />;
+      case 'SSB OTHERS': return <Bell className="h-5 w-5" />;
       case 'CLASS/SESSION SCHEDULE': return <GraduationCap className="h-5 w-5" />;
       case 'ASSIGNMENTS & TASKS': return <ClipboardList className="h-5 w-5" />;
       case 'Events & Announcements': return <Bell className="h-5 w-5" />;
+      case 'EVENTS': return <Bell className="h-5 w-5" />;
+      case 'ANNOUNCEMENTS': return <Bell className="h-5 w-5" />;
       case 'FORMS': return <FileText className="h-5 w-5" />;
       case 'Resource': return <BookOpen className="h-5 w-5" />;
       default: return <CalendarIcon className="h-5 w-5" />;
@@ -156,9 +410,16 @@ const Calendar: React.FC = () => {
 
   const getCategoryColor = (category: string) => {
     switch (category) {
+      case 'SESSIONS': return 'text-blue-600';
+      case 'SSB EVENT': return 'text-purple-600';
+      case 'SSB SESSION': return 'text-blue-600';
+      case 'SSB ASSESSMENT': return 'text-orange-600';
+      case 'SSB OTHERS': return 'text-gray-600';
       case 'CLASS/SESSION SCHEDULE': return 'text-[#1d8f5b]';
       case 'ASSIGNMENTS & TASKS': return 'text-[#ffc300]';
       case 'Events & Announcements': return 'text-purple-600';
+      case 'EVENTS': return 'text-purple-600';
+      case 'ANNOUNCEMENTS': return 'text-purple-600';
       case 'FORMS': return 'text-indigo-600';
       case 'Resource': return 'text-green-600';
       default: return 'text-gray-600';
@@ -167,9 +428,16 @@ const Calendar: React.FC = () => {
 
   const getCategoryBgColor = (category: string) => {
     switch (category) {
+      case 'SESSIONS': return 'bg-blue-100 dark:bg-blue-900/20';
+      case 'SSB EVENT': return 'bg-purple-100 dark:bg-purple-900/20';
+      case 'SSB SESSION': return 'bg-blue-100 dark:bg-blue-900/20';
+      case 'SSB ASSESSMENT': return 'bg-orange-100 dark:bg-orange-900/20';
+      case 'SSB OTHERS': return 'bg-gray-100 dark:bg-gray-800';
       case 'CLASS/SESSION SCHEDULE': return 'bg-green-100 dark:bg-green-900/20';
       case 'ASSIGNMENTS & TASKS': return 'bg-yellow-100 dark:bg-yellow-900/20';
       case 'Events & Announcements': return 'bg-purple-100 dark:bg-purple-900/20';
+      case 'EVENTS': return 'bg-purple-100 dark:bg-purple-900/20';
+      case 'ANNOUNCEMENTS': return 'bg-purple-100 dark:bg-purple-900/20';
       case 'FORMS': return 'bg-indigo-100 dark:bg-indigo-900/20';
       case 'Resource': return 'bg-green-100 dark:bg-green-900/20';
       default: return 'bg-gray-100 dark:bg-gray-800';
@@ -179,17 +447,28 @@ const Calendar: React.FC = () => {
   // Navigation handler for calendar items
   const handleItemClick = (item: ContentItem) => {
     switch (item.category) {
+      case 'SESSIONS':
+        // Navigate to Sessions page (Live & Upcoming tab by default)
+        navigate('/sessions');
+        toast.success('Navigating to sessions');
+        break;
       case 'CLASS/SESSION SCHEDULE':
         navigate('/overview'); // Classes shown on main overview page
+        toast.success('Navigating to class/session schedule section');
         break;
       case 'ASSIGNMENTS & TASKS':
         navigate('/assignments');
+        toast.success('Navigating to assignments and tasks section');
         break;
       case 'Events & Announcements':
+      case 'EVENTS':
+      case 'ANNOUNCEMENTS':
         navigate('/announcements'); // Combined events and announcements go to announcements section
+        toast.success('Navigating to events and announcements section');
         break;
       case 'FORMS':
         navigate('/overview'); // Forms might be on overview or could be separate
+        toast.success('Navigating to forms section');
         break;
       case 'Resource':
       case 'COURSE MATERIAL':
@@ -197,25 +476,17 @@ const Calendar: React.FC = () => {
         if (item.term && item.domain && item.subject) {
           const resourcePath = `/resources/${encodeURIComponent(item.term)}/${encodeURIComponent(item.domain)}/${encodeURIComponent(item.subject)}`;
           navigate(resourcePath);
+          toast.success(`Navigating to ${item.subject} in ${item.domain}`);
         } else {
           // Fallback to general resources page if metadata is incomplete
           navigate('/resources');
+          toast.success('Navigating to resources section');
         }
         break;
       default:
         navigate('/overview');
+        toast.success('Navigating to overview');
         break;
-    }
-    
-    // Show a toast to indicate navigation
-    if (item.category === 'Resource' || item.category === 'COURSE MATERIAL') {
-      if (item.term && item.domain && item.subject) {
-        toast.success(`Navigating to ${item.subject} in ${item.domain}`);
-      } else {
-        toast.success('Navigating to resources section');
-      }
-    } else {
-      toast.success(`Navigating to ${item.category.toLowerCase().replace(/[&]/g, 'and')} section`);
     }
   };
 
@@ -303,13 +574,15 @@ const Calendar: React.FC = () => {
   const uniqueStatuses = Array.from(new Set(scheduleItems.map(item => item.status).filter(Boolean)));
   const uniqueCategories = Array.from(new Set(scheduleItems.map(item => item.category).filter(Boolean)));
 
-  // Statistics
+  // Statistics (only Zoom sessions)
   const stats = {
     total: filteredItems.length,
-    assignments: filteredItems.filter(item => item.category === 'ASSIGNMENTS & TASKS').length,
-    eventsAnnouncements: filteredItems.filter(item => item.category === 'Events & Announcements').length,
-    classes: filteredItems.filter(item => item.category === 'CLASS/SESSION SCHEDULE').length,
-    resources: filteredItems.filter(item => item.category === 'Resource').length
+    sessions: filteredItems.length, // All items are sessions
+    bySubject: filteredItems.reduce((acc, item) => {
+      const subject = item.subject || 'Other';
+      acc[subject] = (acc[subject] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>)
   };
 
   // Generate calendar days
@@ -338,51 +611,39 @@ const Calendar: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      {/* Header Stats - Zoom Sessions Only */}
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <CalendarIcon className="h-5 w-5 text-[#1d8f5b]" />
+              <Video className="h-5 w-5 text-blue-600" />
               <div>
                 <p className="text-2xl font-bold text-foreground">{stats.total}</p>
-                <p className="text-sm text-muted-foreground">Total Items</p>
+                <p className="text-sm text-muted-foreground">Total Sessions</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <ClipboardList className="h-5 w-5 text-[#ffc300]" />
+              <BookOpen className="h-5 w-5 text-green-600" />
               <div>
-                <p className="text-2xl font-bold text-foreground">{stats.assignments}</p>
-                <p className="text-sm text-muted-foreground">Assignments</p>
+                <p className="text-2xl font-bold text-foreground">{Object.keys(stats.bySubject).length}</p>
+                <p className="text-sm text-muted-foreground">Subjects</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Bell className="h-5 w-5 text-purple-600" />
-              <div>
-                <p className="text-2xl font-bold text-foreground">{stats.eventsAnnouncements}</p>
-                <p className="text-sm text-muted-foreground">Events & Announcements</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
               <GraduationCap className="h-5 w-5 text-[#1d8f5b]" />
               <div>
-                <p className="text-2xl font-bold text-foreground">{stats.classes}</p>
-                <p className="text-sm text-muted-foreground">Classes</p>
+                <p className="text-2xl font-bold text-foreground">{upcomingEvents.length}</p>
+                <p className="text-sm text-muted-foreground">Upcoming Sessions</p>
               </div>
             </div>
           </CardContent>
@@ -637,6 +898,11 @@ const Calendar: React.FC = () => {
                           <div className="flex items-start justify-between mb-2">
                             <h4 className="font-medium text-foreground">{event.title}</h4>
                             <div className="flex space-x-1">
+                              {event.isNew && (
+                                <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-700">
+                                  Updated
+                                </Badge>
+                              )}
                               <Badge variant="outline" className={getStatusColor(event.status || 'Upcoming')}>
                                 {event.status}
                               </Badge>
@@ -726,7 +992,12 @@ const Calendar: React.FC = () => {
                         <p className="text-xs text-muted-foreground">
                           {dateTime.date} at {dateTime.time}
                         </p>
-                        <div className="flex space-x-1 mt-1">
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {event.isNew && (
+                            <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-700">
+                              Updated
+                            </Badge>
+                          )}
                           <Badge variant="outline" className={getStatusColor(event.status || 'Upcoming')}>
                             {event.status}
                           </Badge>

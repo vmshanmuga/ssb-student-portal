@@ -781,62 +781,119 @@ const Resources: React.FC = () => {
                   <ExternalLink className="h-5 w-5 mr-2 text-gray-600 dark:text-gray-400" />
                   Access Links
                 </h3>
-                
-                {selectedMaterial.fileURL && selectedMaterial.fileURL.trim() && (
-                  <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <ExternalLink className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        <span className="font-medium text-gray-900 dark:text-white">File Link</span>
+
+                {/* Files from Resource Management (File 1-5) */}
+                {(selectedMaterial as any).files && Array.isArray((selectedMaterial as any).files) && (selectedMaterial as any).files.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Files</h4>
+                    {(selectedMaterial as any).files.map((file: any, idx: number) => (
+                      <div key={idx} className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <span className="font-medium text-gray-900 dark:text-white">{file.name}</span>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => window.open(file.url, '_blank')}
+                            className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-500 dark:hover:bg-blue-600"
+                          >
+                            Open
+                          </Button>
+                        </div>
                       </div>
-                      <Button 
-                        size="sm"
-                        onClick={() => window.open(selectedMaterial.fileURL!, '_blank')}
-                        className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-500 dark:hover:bg-blue-600"
-                      >
-                        Open File
-                      </Button>
-                    </div>
+                    ))}
                   </div>
                 )}
-                
-                {(selectedMaterial as any).attachments && (selectedMaterial as any).attachments.trim() && (selectedMaterial as any).attachments.startsWith('http') && (
-                  <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <ExternalLink className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        <span className="font-medium text-gray-900 dark:text-white">Attachment</span>
+
+                {/* URLs from Resource Management */}
+                {(selectedMaterial as any).urls && Array.isArray((selectedMaterial as any).urls) && (selectedMaterial as any).urls.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Links</h4>
+                    {(selectedMaterial as any).urls.map((urlItem: any, idx: number) => (
+                      <div key={idx} className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Link className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            <span className="font-medium text-gray-900 dark:text-white">{urlItem.name}</span>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => window.open(urlItem.url, '_blank')}
+                            className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600"
+                          >
+                            Open
+                          </Button>
+                        </div>
                       </div>
-                      <Button 
-                        size="sm"
-                        onClick={() => window.open((selectedMaterial as any).attachments, '_blank')}
-                        className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-500 dark:hover:bg-blue-600"
-                      >
-                        Open File
-                      </Button>
-                    </div>
+                    ))}
                   </div>
                 )}
-                
-                {(selectedMaterial as any).resourceLink && (selectedMaterial as any).resourceLink.trim() && (selectedMaterial as any).resourceLink.startsWith('http') && (
-                  <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Upload className="h-4 w-4 text-green-600 dark:text-green-400" />
-                        <span className="font-medium text-gray-900 dark:text-white">File Upload Link</span>
+
+                {/* Legacy fields for backward compatibility with ALL IN ONE resources */}
+                {!(selectedMaterial as any).files?.length && !(selectedMaterial as any).urls?.length && (
+                  <>
+                    {selectedMaterial.fileURL && selectedMaterial.fileURL.trim() && (
+                      <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <ExternalLink className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <span className="font-medium text-gray-900 dark:text-white">File Link</span>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => window.open(selectedMaterial.fileURL!, '_blank')}
+                            className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-500 dark:hover:bg-blue-600"
+                          >
+                            Open File
+                          </Button>
+                        </div>
                       </div>
-                      <Button 
-                        size="sm"
-                        onClick={() => window.open((selectedMaterial as any).resourceLink, '_blank')}
-                        className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600"
-                      >
-                        Open Link
-                      </Button>
-                    </div>
-                  </div>
+                    )}
+
+                    {(selectedMaterial as any).attachments && (selectedMaterial as any).attachments.trim() && (selectedMaterial as any).attachments.startsWith('http') && (
+                      <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <ExternalLink className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <span className="font-medium text-gray-900 dark:text-white">Attachment</span>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => window.open((selectedMaterial as any).attachments, '_blank')}
+                            className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-500 dark:hover:bg-blue-600"
+                          >
+                            Open File
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {(selectedMaterial as any).resourceLink && (selectedMaterial as any).resourceLink.trim() && (selectedMaterial as any).resourceLink.startsWith('http') && (
+                      <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Upload className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            <span className="font-medium text-gray-900 dark:text-white">File Upload Link</span>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => window.open((selectedMaterial as any).resourceLink, '_blank')}
+                            className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600"
+                          >
+                            Open Link
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
-                
-                {!selectedMaterial.fileURL?.trim() && !(selectedMaterial as any).attachments?.trim() && !(selectedMaterial as any).resourceLink?.trim() && (
+
+                {!(selectedMaterial as any).files?.length &&
+                 !(selectedMaterial as any).urls?.length &&
+                 !selectedMaterial.fileURL?.trim() &&
+                 !(selectedMaterial as any).attachments?.trim() &&
+                 !(selectedMaterial as any).resourceLink?.trim() && (
                   <p className="text-gray-500 dark:text-gray-400 text-sm italic">No access links available</p>
                 )}
               </div>

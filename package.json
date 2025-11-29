@@ -12,6 +12,12 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "@tiptap/extension-color": "^3.11.0",
+    "@tiptap/extension-highlight": "^3.11.0",
+    "@tiptap/extension-text-align": "^3.11.0",
+    "@tiptap/extension-text-style": "^3.11.0",
+    "@tiptap/react": "^3.11.0",
+    "@tiptap/starter-kit": "^3.11.0",
     "@types/dompurify": "^3.0.5",
     "@types/jest": "^27.5.2",
     "@types/node": "^16.18.126",
@@ -23,9 +29,11 @@
     "dompurify": "^3.2.7",
     "firebase": "^11.9.1",
     "lucide-react": "^0.525.0",
+    "quill": "^2.0.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-hot-toast": "^2.5.2",
+    "react-quill-new": "^3.6.0",
     "react-router-dom": "^7.8.2",
     "react-scripts": "5.0.1",
     "tailwind-merge": "^3.3.1",
@@ -33,9 +41,9 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
+    "start": "craco start",
+    "build": "craco build",
+    "test": "craco test",
     "eject": "react-scripts eject",
     "backend:push": "cd backend && clasp push",
     "backend:pull": "cd backend && clasp pull",
@@ -64,7 +72,9 @@
     ]
   },
   "devDependencies": {
+    "@craco/craco": "^7.1.0",
     "@google/clasp": "^2.4.2",
+    "babel-plugin-transform-remove-console": "^6.9.4",
     "concurrently": "^7.6.0",
     "nodemon": "^2.0.22"
   }

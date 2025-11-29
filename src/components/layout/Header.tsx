@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, Sun, Moon, User, LogOut } from 'lucide-react';
+import { Menu, Sun, Moon, User, LogOut, Video, Film, FileEdit } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from '../ui/dropdown-menu';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { signOut } from 'firebase/auth';
 import { apiService, type StudentProfile, type FullStudentProfile } from '../../services/api';
@@ -16,7 +16,8 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ sidebarOpen, setSidebarOpen }) => {
   const navigate = useNavigate();
-  
+  const location = useLocation();
+
   const [isDark, setIsDark] = React.useState(() => {
     // Set dark theme as default
     const stored = localStorage.getItem('theme');
@@ -26,6 +27,19 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, setSidebarOpen }) => {
   const [fullProfile, setFullProfile] = useState<FullStudentProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const user = auth.currentUser;
+
+  // Session tabs configuration
+  const tabs = [
+    { id: 'sessions', label: 'Live & Upcoming', icon: Video, path: '/sessions' },
+    { id: 'recordings', label: 'Recordings', icon: Film, path: '/sessions?tab=recordings' },
+    { id: 'notes', label: 'My Notes', icon: FileEdit, path: '/my-notes' },
+  ];
+
+  // Check if we're on a sessions-related page - only show tabs on My Notes page
+  const showTabs = location.pathname === '/my-notes';
+
+  // Show menu button on desktop for Sessions/Notes pages (sidebar is collapsed)
+  const showMenuOnDesktop = location.pathname === '/sessions' || location.pathname === '/my-notes';
 
   useEffect(() => {
     // Apply dark theme by default on first load
@@ -90,18 +104,19 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, setSidebarOpen }) => {
 
   return (
     <header className="bg-background border-b border-border">
-      <div className="px-6 py-4">
+      <div className="px-6 py-3.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Button
               variant="ghost"
               size="sm"
-              className="lg:hidden"
+              className={showMenuOnDesktop ? "" : "lg:hidden"}
               onClick={() => setSidebarOpen(!sidebarOpen)}
+              title="Toggle Sidebar"
             >
               <Menu className="h-5 w-5" />
             </Button>
-            <div>
+            <div className="flex items-center gap-6">
               <p className="text-lg text-muted-foreground">
                 {profileLoading ? (
                   <span className="opacity-50">Loading...</span>
@@ -111,9 +126,39 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, setSidebarOpen }) => {
                   </span>
                 )}
               </p>
+
+              {/* Session Tabs - shown only on sessions and my-notes pages */}
+              {showTabs && (
+                <div className="flex gap-1 ml-6">
+                  {tabs.map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive =
+                      (tab.id === 'notes' && location.pathname === '/my-notes') ||
+                      (tab.id === 'sessions' && location.pathname === '/sessions') ||
+                      (tab.id === 'recordings' && location.pathname === '/sessions' && location.search.includes('tab=recordings'));
+
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => navigate(tab.path)}
+                        className={`
+                          flex items-center gap-2 px-4 py-1.5 rounded-lg font-medium transition-all text-sm
+                          ${isActive
+                            ? 'bg-primary/10 text-primary border border-primary/20'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                          }
+                        `}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span>{tab.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-4">
             <Button
               variant="ghost"

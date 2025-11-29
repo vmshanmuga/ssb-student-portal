@@ -385,14 +385,28 @@
     background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(25px);
     border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 
+    box-shadow:
       0 30px 60px rgba(0, 0, 0, 0.3),
       inset 0 1px 0 rgba(255, 255, 255, 0.2),
       inset 0 0 50px rgba(29, 143, 91, 0.1);
     position: relative;
-    overflow: hidden;
+    overflow: visible;
   }
-  
+
+  /* Dark mode - fully transparent glass effect */
+  .dark .ultimate-glass {
+    background: transparent;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  /* Only apply shadow to non-live cards in dark mode */
+  .dark .ultimate-glass:not(.live-glow) {
+    box-shadow:
+      0 10px 30px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
   .ultimate-glass::before {
     content: '';
     position: absolute;
@@ -400,11 +414,15 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(135deg, 
+    background: linear-gradient(135deg,
       rgba(255, 255, 255, 0.1) 0%,
       transparent 50%,
       rgba(29, 143, 91, 0.05) 100%);
     pointer-events: none;
+  }
+
+  .dark .ultimate-glass::before {
+    background: transparent;
   }
   
   /* Floating Particles inside Glass */
@@ -773,8 +791,30 @@
   }
   
   @keyframes statusPulse {
-    0%, 100% { box-shadow: 0 0 10px rgba(34, 197, 94, 0.5); }
-    50% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.8), 0 0 30px rgba(34, 197, 94, 0.4); }
+    0%, 100% { box-shadow: 0 0 15px rgba(34, 197, 94, 0.6), 0 0 25px rgba(34, 197, 94, 0.3); }
+    50% { box-shadow: 0 0 25px rgba(34, 197, 94, 0.9), 0 0 40px rgba(34, 197, 94, 0.5), 0 0 60px rgba(34, 197, 94, 0.3); }
+  }
+
+  @keyframes liveGlow {
+    0%, 100% {
+      box-shadow:
+        0 0 0 3px #22c55e,
+        0 0 20px 8px rgba(34, 197, 94, 0.8),
+        0 0 40px 15px rgba(34, 197, 94, 0.6),
+        0 0 80px 25px rgba(34, 197, 94, 0.4);
+    }
+    50% {
+      box-shadow:
+        0 0 0 3px #22c55e,
+        0 0 30px 12px rgba(34, 197, 94, 1),
+        0 0 60px 25px rgba(34, 197, 94, 0.8),
+        0 0 120px 40px rgba(34, 197, 94, 0.6);
+    }
+  }
+
+  .live-glow {
+    animation: liveGlow 2s ease-in-out infinite !important;
+    border: 3px solid #22c55e !important;
   }
   
   /* NEW EPIC ANIMATIONS */
@@ -905,5 +945,105 @@
   @keyframes jupiterMoon4 {
     0% { transform: translateY(-50%) rotate(0deg) translateX(-18px) rotate(0deg); }
     100% { transform: translateY(-50%) rotate(360deg) translateX(-18px) rotate(-360deg); }
+  }
+
+  /* True Glass Morphism for Dark Mode */
+
+  /* Glass morphism borders - ultra thin and light */
+  .dark [class*="border"]:not([class*="border-0"]):not([class*="border-none"]) {
+    border-width: 0.5px;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+  }
+
+  .dark .border {
+    border-width: 0.5px;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+  }
+
+  .dark .border-t {
+    border-top-width: 0.5px;
+    border-top-color: rgba(255, 255, 255, 0.12) !important;
+  }
+
+  .dark .border-b {
+    border-bottom-width: 0.5px;
+    border-bottom-color: rgba(255, 255, 255, 0.12) !important;
+  }
+
+  .dark .border-l {
+    border-left-width: 0.5px;
+    border-left-color: rgba(255, 255, 255, 0.12) !important;
+  }
+
+  .dark .border-r {
+    border-right-width: 0.5px;
+    border-right-color: rgba(255, 255, 255, 0.12) !important;
+  }
+
+  .dark .divide-y > *:not(:first-child) {
+    border-top-width: 0.5px;
+    border-top-color: rgba(255, 255, 255, 0.12) !important;
+  }
+
+  .dark .divide-x > *:not(:first-child) {
+    border-left-width: 0.5px;
+    border-left-color: rgba(255, 255, 255, 0.12) !important;
+  }
+
+  /* True Glass Morphism Cards - Frosted Glass Effect */
+  .dark .bg-white,
+  .dark .bg-gray-50,
+  .dark .bg-gray-100,
+  .dark [class*="bg-gray"] {
+    background: rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 8px 32px 0 rgba(0, 0, 0, 0.37),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+      inset 0 -1px 0 0 rgba(255, 255, 255, 0.03);
+  }
+
+  /* Enhanced glass effect for rounded containers */
+  .dark .rounded-lg,
+  .dark .rounded-xl,
+  .dark .rounded-2xl {
+    position: relative;
+  }
+
+  .dark .rounded-lg::before,
+  .dark .rounded-xl::before,
+  .dark .rounded-2xl::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: inherit;
+    padding: 0.5px;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.15) 0%,
+      rgba(255, 255, 255, 0.05) 50%,
+      rgba(255, 255, 255, 0.15) 100%
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Skeleton loading glass effect - only apply to skeleton components */
+  .dark .skeleton.animate-pulse {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      rgba(255, 255, 255, 0.08) 50%,
+      rgba(255, 255, 255, 0.03) 100%
+    ) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
 }

@@ -28,9 +28,11 @@ const Login: React.FC = () => {
       console.log('Checking profile for:', user.email);
       const profileResult = await apiService.getStudentProfile(user.email);
       console.log('Login profile result:', profileResult);
+      console.log('Login profile data:', profileResult.data);
+      console.log('Login isAdmin flag:', profileResult.data?.isAdmin);
       toast.dismiss(loadingToast);
-      
-      if (!profileResult.success) {
+
+      if (!profileResult.success || !profileResult.data) {
         await auth.signOut();
         toast.error(`Student not found: ${profileResult.error || 'Please contact administrator'}`);
         console.error('Login failed:', profileResult);
@@ -38,8 +40,19 @@ const Login: React.FC = () => {
         return;
       }
 
-      toast.success(`Welcome, ${profileResult.data?.fullName || user.displayName}!`);
-      
+      // Store user profile in localStorage for AuthContext
+      const userData = {
+        studentId: profileResult.data.email.split('@')[0],
+        email: profileResult.data.email,
+        name: profileResult.data.fullName,
+        batch: profileResult.data.batch,
+        isAdmin: profileResult.data.isAdmin || false,
+      };
+      console.log('Login: Storing user data:', userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+
+      toast.success(`Welcome, ${profileResult.data.fullName || user.displayName}!`);
+
       // User will be redirected by the auth state listener in App.tsx
       
     } catch (error: any) {

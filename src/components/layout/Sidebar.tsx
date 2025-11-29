@@ -1,19 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  ClipboardList, 
-  Megaphone, 
-  FolderOpen, 
-  Calendar, 
+import {
+  LayoutDashboard,
+  Megaphone,
+  FolderOpen,
+  Calendar,
   FileText,
   User,
   Menu,
   BarChart3,
-  Users
+  Users,
+  Video,
+  Shield,
+  ListChecks,
+  GraduationCap,
+  ChevronDown,
+  ChevronRight,
+  Briefcase
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -23,17 +30,42 @@ interface SidebarProps {
 const navigation = [
   { name: 'Overview', href: '/overview', icon: LayoutDashboard },
   { name: 'Dashboard', href: '/dashboards', icon: BarChart3 },
-  { name: 'Assignments', href: '/assignments', icon: ClipboardList },
+  { name: 'Sessions', href: '/sessions', icon: Video },
   { name: 'Events & Announcements', href: '/announcements', icon: Megaphone },
   { name: 'Resources', href: '/resources', icon: FolderOpen },
   { name: 'Students Corner', href: '/students-corner', icon: Users },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
+  { name: 'Forms', href: '/forms', icon: ListChecks },
   { name: 'Policy & Documents', href: '/policies', icon: FileText },
-  { name: 'Profile', href: '/profile', icon: User },
+  // { name: 'Exams', href: '/exams', icon: GraduationCap }, // Hidden for now
+  {
+    name: 'Profile',
+    href: '/profile',
+    icon: User,
+    subItems: [
+      { name: 'Placement Profile', href: '/profile/placement', icon: Briefcase }
+    ]
+  },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
   const location = useLocation();
+  const { student } = useAuth();
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
+
+  // Add Admin to navigation if user is admin
+  const allNavigation = [
+    ...navigation,
+    ...(student?.isAdmin ? [{ name: 'Admin', href: '/admin', icon: Shield }] : [])
+  ];
+
+  const toggleExpanded = (itemName: string) => {
+    setExpandedItems(prev =>
+      prev.includes(itemName)
+        ? prev.filter(name => name !== itemName)
+        : [...prev, itemName]
+    );
+  };
 
   return (
     <>
@@ -52,7 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
       )}>
         <div className="flex flex-col h-full">
           {/* Logo and close button */}
-          <div className="flex items-center justify-between p-6 border-b border-border">
+          <div className="flex items-center justify-between px-6 py-3.5 border-b border-border">
             <div className="flex items-center space-x-3">
               {/* Logo with green background for better visibility */}
               <div className="flex items-center bg-primary rounded-lg p-2">
@@ -76,23 +108,74 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-2">
-            {navigation.map((item) => {
+            {allNavigation.map((item) => {
               const isActive = location.pathname === item.href;
+              const hasSubItems = item.subItems && item.subItems.length > 0;
+              const isExpanded = expandedItems.includes(item.name);
+              const isSubItemActive = hasSubItems && item.subItems.some(subItem => location.pathname === subItem.href);
+
               return (
-                <NavLink
-                  key={item.name}
-                  to={item.href}
-                  className={cn(
-                    "flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                <div key={item.name}>
+                  {/* Main navigation item */}
+                  <div className="relative">
+                    <NavLink
+                      to={item.href}
+                      className={cn(
+                        "flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                        isActive
+                          ? "bg-primary text-primary-foreground"
+                          : isSubItemActive
+                          ? "bg-accent text-accent-foreground"
+                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                      )}
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <item.icon className="mr-3 h-4 w-4 flex-shrink-0" />
+                      {item.name}
+                      {hasSubItems && (
+                        <button
+                          className="ml-auto p-1 rounded hover:bg-accent/50"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleExpanded(item.name);
+                          }}
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </button>
+                      )}
+                    </NavLink>
+                  </div>
+
+                  {/* Sub-items */}
+                  {hasSubItems && isExpanded && (
+                    <div className="ml-4 mt-1 space-y-1">
+                      {item.subItems.map((subItem) => {
+                        const isSubActive = location.pathname === subItem.href;
+                        return (
+                          <NavLink
+                            key={subItem.name}
+                            to={subItem.href}
+                            className={cn(
+                              "flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                              isSubActive
+                                ? "bg-primary/80 text-primary-foreground"
+                                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                            )}
+                            onClick={() => setIsOpen(false)}
+                          >
+                            <subItem.icon className="mr-3 h-4 w-4 flex-shrink-0" />
+                            {subItem.name}
+                          </NavLink>
+                        );
+                      })}
+                    </div>
                   )}
-                  onClick={() => setIsOpen(false)}
-                >
-                  <item.icon className="mr-3 h-4 w-4 flex-shrink-0" />
-                  {item.name}
-                </NavLink>
+                </div>
               );
             })}
           </nav>
