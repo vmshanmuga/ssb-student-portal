@@ -32,6 +32,7 @@ import {
 import { apiService, type ContentItem } from '../services/api';
 import { auth } from '../firebase/config';
 import toast from 'react-hot-toast';
+import { useActivityTracker } from '../hooks/useActivityTracker';
 
 // Types for the dynamic folder structure
 interface CourseResourcesData {
@@ -55,7 +56,8 @@ interface NavigationLevel {
 const Resources: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  
+  const { trackPageView, trackResourceDownload } = useActivityTracker();
+
   const [courseData, setCourseData] = useState<CourseResourcesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -67,9 +69,13 @@ const Resources: React.FC = () => {
   const [navigationHistory, setNavigationHistory] = useState<NavigationLevel[]>([]);
   const [selectedMaterial, setSelectedMaterial] = useState<ContentItem | null>(null);
   const [showMaterialModal, setShowMaterialModal] = useState(false);
-  
+
   const user = auth.currentUser;
 
+  // Track page view on mount
+  useEffect(() => {
+    trackPageView('Resources');
+  }, [trackPageView]);
 
   const fetchCourseResources = async () => {
     try {
@@ -85,16 +91,36 @@ const Resources: React.FC = () => {
       }
 
       const result = await apiService.getCourseResources(user.email);
-      
+
+      console.log('🔍 FULL API RESPONSE:', JSON.stringify(result, null, 2));
+
       if (!result.success) {
-        console.log('Resources: API call failed:', result.error);
+        console.log('❌ Resources: API call failed:', result.error);
         toast.error(`Failed to load course resources: ${result.error || 'Unknown error'}`);
         setLoading(false);
         return;
       }
 
+      console.log('📊 Available Terms:', result.data?.availableTerms);
+      console.log('📚 Total Materials:', result.data?.flatMaterials?.length);
+      console.log('🗂️ Folder Structure:', result.data?.folderStructure);
+
       setCourseData(result.data || { availableTerms: [], folderStructure: {}, flatMaterials: [] });
-      console.log('Resources: Data loaded successfully');
+      console.log('✅ Resources: Data loaded successfully');
+
+      // Debug logging
+      if ((result as any).debug) {
+        console.log('=== 🐛 BACKEND DEBUG INFO ===');
+        console.log('Student Batch:', (result as any).debug.studentBatch);
+        console.log('Total Materials:', (result as any).debug.totalMaterials);
+        console.log('From ALLINONE:', (result as any).debug.allInOneCount);
+        console.log('From Resources Management:', (result as any).debug.resourceMgmtCount);
+        console.log('Materials by Term:', (result as any).debug.termCounts);
+        console.log('================================');
+      } else {
+        console.warn('⚠️ NO DEBUG INFO - Backend code NOT updated yet!');
+      }
+
       setLoading(false);
       
     } catch (error) {
@@ -265,23 +291,11 @@ const Resources: React.FC = () => {
     }
   };
 
-  const handleDownload = (material: ContentItem) => {
-    const fileURL = material.fileURL;
-    const attachments = (material as any).attachments;
-    const resourceLink = (material as any).resourceLink;
-    
-    if (fileURL && fileURL.trim()) {
-      window.open(fileURL, '_blank');
-    } else if (attachments && attachments.trim()) {
-      window.open(attachments, '_blank');
-    } else if (resourceLink && resourceLink.trim()) {
-      window.open(resourceLink, '_blank');
-    } else {
-      toast.error('No downloadable content available');
-    }
-  };
-
   const openMaterialModal = (material: ContentItem) => {
+    // Track resource view
+    const resourceName = material.title || material.subTitle || 'Unknown Resource';
+    trackResourceDownload(resourceName);
+
     console.log('Material data:', {
       term: material.term,
       priority: material.priority,
@@ -459,16 +473,16 @@ const Resources: React.FC = () => {
               </div>
               
               <div className="pt-2">
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   className="w-full"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDownload(material);
+                    openMaterialModal(material);
                   }}
                 >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Open
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Details
                 </Button>
               </div>
             </div>
@@ -518,15 +532,15 @@ const Resources: React.FC = () => {
               </div>
               
               <div className="flex-shrink-0">
-                <Button 
+                <Button
                   size="sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDownload(material);
+                    openMaterialModal(material);
                   }}
                 >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Open
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Details
                 </Button>
               </div>
             </div>
