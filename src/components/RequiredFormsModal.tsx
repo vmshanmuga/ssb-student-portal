@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { AlertCircle, FileText, Clock, Users } from 'lucide-react';
+import { AlertCircle, FileText, Clock, Users, ChevronLeft, ChevronRight } from 'lucide-react';
 import { auth } from '../firebase/config';
 import { getForms, getUserFormResponses } from '../services/formsApi';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,16 +20,21 @@ interface RequiredForm {
   startDateTime: string;
   endDateTime?: string;
   visibleTo?: string;
+  showAtStartUntilFilled?: string;
 }
 
 const RequiredFormsModal: React.FC = () => {
-  const [requiredForm, setRequiredForm] = useState<RequiredForm | null>(null);
+  const [requiredForms, setRequiredForms] = useState<RequiredForm[]>([]);
+  const [currentFormIndex, setCurrentFormIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
+  const [lastClickedDirection, setLastClickedDirection] = useState<'left' | 'right' | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const user = auth.currentUser;
   const { student } = useAuth();
+
+  const requiredForm = requiredForms[currentFormIndex] || null;
 
   // Parse date from backend format - handles multiple formats
   const parseDate = (dateStr: string) => {
@@ -136,15 +141,15 @@ const RequiredFormsModal: React.FC = () => {
     try {
       setLoading(true);
 
-      // Fetch active forms with showAtStartUntilFilled = Yes
+      // Fetch ALL active forms (not just showAtStartUntilFilled)
       const result = await getForms({
         isActive: 'Yes',
-        showAtStartUntilFilled: 'Yes',
         includeUserEmail: true
       });
 
       if (result.success && result.data) {
         const forms = result.data as any[];
+        const uncompletedForms: RequiredForm[] = [];
 
         // Check each form to see if user has completed it
         for (const form of forms) {
@@ -184,29 +189,48 @@ const RequiredFormsModal: React.FC = () => {
             const responses = responsesResult.data as any[];
             const completedResponse = responses.find(r => r.isComplete === 'Yes');
 
-            // If not completed, this is the required form to show
+            // If not completed, add to uncompleted forms list
             if (!completedResponse) {
-              console.log('📝 Setting required form (not completed):', form);
-              setRequiredForm(form);
-              setLoading(false);
-              return;
+              console.log('📝 Adding uncompleted form:', form);
+              uncompletedForms.push(form);
             }
           } else {
             // No responses yet, so form is not completed
-            console.log('📝 Setting required form (no responses):', form);
-            setRequiredForm(form);
-            setLoading(false);
-            return;
+            console.log('📝 Adding form with no responses:', form);
+            uncompletedForms.push(form);
           }
         }
 
-        // No required forms to show
-        setRequiredForm(null);
+        // Sort uncompleted forms by End_DateTime (closest to end first)
+        const sortedForms = uncompletedForms.sort((a, b) => {
+          // If no end date, put it at the end
+          if (!a.endDateTime) return 1;
+          if (!b.endDateTime) return -1;
+
+          const endA = parseDate(a.endDateTime);
+          const endB = parseDate(b.endDateTime);
+
+          if (!endA) return 1;
+          if (!endB) return -1;
+
+          // Earlier end date comes first (closer to deadline)
+          return endA.getTime() - endB.getTime();
+        });
+
+        // Prioritize forms with Show_At_Start_Until_Filled = Yes at the beginning
+        const priorityForms = sortedForms.filter(f => f.showAtStartUntilFilled?.toLowerCase() === 'yes');
+        const regularForms = sortedForms.filter(f => f.showAtStartUntilFilled?.toLowerCase() !== 'yes');
+
+        const finalSortedForms = [...priorityForms, ...regularForms];
+
+        console.log(`📝 Found ${finalSortedForms.length} uncompleted forms`);
+        setRequiredForms(finalSortedForms);
+        setCurrentFormIndex(0); // Reset to first form
       }
     } catch (error) {
       // Silently fail - this is usually a transient error during initial page load
       // The component will retry when user navigates or refreshes
-      setRequiredForm(null);
+      setRequiredForms([]);
     } finally {
       setLoading(false);
     }
@@ -218,19 +242,33 @@ const RequiredFormsModal: React.FC = () => {
     }
   };
 
+  const handlePrevious = () => {
+    if (currentFormIndex > 0) {
+      setCurrentFormIndex(currentFormIndex - 1);
+      setLastClickedDirection('left');
+    }
+  };
+
+  const handleNext = () => {
+    if (currentFormIndex < requiredForms.length - 1) {
+      setCurrentFormIndex(currentFormIndex + 1);
+      setLastClickedDirection('right');
+    }
+  };
+
   // Don't show modal for admin users
   if (student?.isAdmin) {
     return null;
   }
 
-  // Don't render anything if loading or no required form
-  if (loading || !requiredForm) {
+  // Don't render anything if loading or no required forms
+  if (loading || requiredForms.length === 0) {
     return null;
   }
 
-  // Don't show modal if user is currently on the form fill page for this specific form
-  // This allows them to fill the form without the modal blocking them
-  if (location.pathname === `/forms/${requiredForm.id}`) {
+  // Don't show modal if user is currently on any of the required form fill pages
+  // This allows them to fill forms without the modal blocking them
+  if (requiredForms.some(form => location.pathname === `/forms/${form.id}`)) {
     return null;
   }
 
@@ -239,14 +277,33 @@ const RequiredFormsModal: React.FC = () => {
       <Card className="max-w-2xl w-full shadow-2xl border-2 border-primary animate-in fade-in zoom-in duration-300">
         <CardContent className="p-8">
           {/* Header */}
-          <div className="flex items-center gap-4 mb-6">
-            <div className="p-3 bg-red-100 dark:bg-red-900/20 rounded-full">
-              <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+          <div className="flex items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-red-100 dark:bg-red-900/20 rounded-full">
+                <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-foreground">
+                  {requiredForm?.showAtStartUntilFilled?.toLowerCase() === 'yes'
+                    ? 'Required Form'
+                    : 'Pending Forms'}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {requiredForm?.showAtStartUntilFilled?.toLowerCase() === 'yes'
+                    ? 'Please complete this form to continue'
+                    : 'You have pending forms to fill'}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-2xl font-bold text-foreground">Required Form</h2>
-              <p className="text-sm text-muted-foreground">Please complete this form to continue</p>
-            </div>
+
+            {/* Form counter */}
+            {requiredForms.length > 1 && (
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-sm px-3 py-1">
+                  {currentFormIndex + 1} of {requiredForms.length}
+                </Badge>
+              </div>
+            )}
           </div>
 
           {/* Form Details */}
@@ -262,9 +319,11 @@ const RequiredFormsModal: React.FC = () => {
                   )}
 
                   <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline" className="bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300">
-                      Required
-                    </Badge>
+                    {requiredForm.showAtStartUntilFilled?.toLowerCase() === 'yes' && (
+                      <Badge variant="outline" className="bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300">
+                        Required
+                      </Badge>
+                    )}
 
                     <Badge variant="outline">
                       {requiredForm.type}
@@ -298,14 +357,34 @@ const RequiredFormsModal: React.FC = () => {
               <p className="text-sm text-yellow-800 dark:text-yellow-200 flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                 <span>
-                  This form must be completed to continue using the portal. You can access other tabs after filling this form.
+                  {requiredForm?.showAtStartUntilFilled?.toLowerCase() === 'yes'
+                    ? 'This form must be completed to continue using the portal. You can access other tabs after filling this form.'
+                    : 'You have pending forms to complete. Navigate through forms using the arrows below.'}
                 </span>
               </p>
             </div>
           </div>
 
-          {/* Action Button */}
-          <div className="flex justify-center">
+          {/* Action Buttons with Navigation */}
+          <div className="flex items-center justify-center gap-4">
+            {/* Left Arrow */}
+            {requiredForms.length > 1 && (
+              <Button
+                onClick={handlePrevious}
+                disabled={currentFormIndex === 0}
+                variant="outline"
+                size="lg"
+                className={`px-4 py-6 transition-all ${
+                  lastClickedDirection === 'left'
+                    ? 'bg-green-500 hover:bg-green-600 text-white border-green-500'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600'
+                }`}
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </Button>
+            )}
+
+            {/* Fill Form Button */}
             <Button
               onClick={handleFillForm}
               size="lg"
@@ -314,6 +393,23 @@ const RequiredFormsModal: React.FC = () => {
               <FileText className="h-5 w-5 mr-2" />
               Fill Form Now
             </Button>
+
+            {/* Right Arrow */}
+            {requiredForms.length > 1 && (
+              <Button
+                onClick={handleNext}
+                disabled={currentFormIndex === requiredForms.length - 1}
+                variant="outline"
+                size="lg"
+                className={`px-4 py-6 transition-all ${
+                  lastClickedDirection === 'right'
+                    ? 'bg-green-500 hover:bg-green-600 text-white border-green-500'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600'
+                }`}
+              >
+                <ChevronRight className="h-6 w-6" />
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
